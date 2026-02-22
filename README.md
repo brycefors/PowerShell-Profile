@@ -1,6 +1,6 @@
 # PowerShell Profile
 
-This repository contains a custom PowerShell profile script designed to enhance the terminal experience on Windows with improved aesthetics, navigation shortcuts, and utility functions.
+This repository contains my personal PowerShell profile script, designed to enhance the terminal experience on Windows with improved aesthetics, navigation shortcuts, and utility functions tailored to my workflow.
 
 ## Features
 
@@ -36,13 +36,12 @@ This repository contains a custom PowerShell profile script designed to enhance 
 
 ## Installation
 
-1. Clone this repository.
-2. Create a symbolic link from your PowerShell profile path to the script in this repo.
+1. Clone this repository and navigate into the directory.
+2. Run the following command to symlink your profile:
 
 ```powershell
-# Run in PowerShell as Administrator
-$RepoProfile = "c:\Users\bfors\My Drive\Homelab\Repos\PowerShell-Profile\Microsoft.PowerShell_profile.ps1"
-New-Item -ItemType SymbolicLink -Path $PROFILE -Value $RepoProfile -Force
+# Run in PowerShell as Administrator inside the repo folder
+New-Item -ItemType SymbolicLink -Path $PROFILE -Value "$PWD\Microsoft.PowerShell_profile.ps1" -Force
 ```
 
 ## Requirements
