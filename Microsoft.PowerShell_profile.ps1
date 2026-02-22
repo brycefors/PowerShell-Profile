@@ -1,4 +1,10 @@
 # --- Shell Configuration ---
+# Install PSReadLine if missing
+if (-not (Get-Module -ListAvailable PSReadLine)) {
+    Write-Host "PSReadLine not found. Installing..." -ForegroundColor Yellow
+    Install-Module PSReadLine -Force -Scope CurrentUser
+}
+
 # Shows navigable menu of all options when hitting Tab
 Set-PSReadlineKeyHandler -Key Tab -Function MenuComplete
 
