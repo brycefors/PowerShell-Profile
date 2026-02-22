@@ -21,18 +21,16 @@ if (-not $isFontInstalled -and (Get-Command oh-my-posh -ErrorAction SilentlyCont
     oh-my-posh font install meslo
 }
 
-if (Get-Command oh-my-posh -ErrorAction SilentlyContinue) {
-    $shell = if ($PSVersionTable.PSVersion.Major -le 5) { 'powershell' } else { 'pwsh' }
-    oh-my-posh init $shell | Invoke-Expression
+if ($PSVersionTable.PSVersion.Major -ge 6 -and (Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
+    oh-my-posh init pwsh | Invoke-Expression
 }
 
 # Enable Predictive IntelliSense (History based)
-if ($PSVersionTable.PSVersion.Major -ge 7) {
-    try {
-        Set-PSReadLineOption -PredictionSource History -ErrorAction Stop
-        Set-PSReadLineOption -PredictionViewStyle ListView -ErrorAction Stop
-    } catch {}
-}
+try {
+    Set-PSReadLineOption -PredictionSource History
+    Set-PSReadLineOption -PredictionViewStyle ListView
+} catch {}
+
 
 # --- Completions ---
 # Register winget autocomplete
