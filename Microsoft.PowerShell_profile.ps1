@@ -95,6 +95,24 @@ function sudo {
     Start-Process -FilePath $Command -ArgumentList $Arguments -Verb RunAs
 }
 
+# Reboot the computer
+function reboot {
+    Write-Host "Rebooting in 5 seconds... Press any key to cancel." -ForegroundColor Yellow
+    for ($i = 5; $i -gt 0; $i--) {
+        Write-Host -NoNewline "$i... "
+        for ($j = 0; $j -lt 10; $j++) {
+            if ([Console]::KeyAvailable) {
+                $null = [Console]::ReadKey($true)
+                Write-Host "`nReboot cancelled." -ForegroundColor Green
+                return
+            }
+            Start-Sleep -Milliseconds 100
+        }
+    }
+    Write-Host "`nRebooting..." -ForegroundColor Red
+    Restart-Computer
+}
+
 # Set Windows Terminal Font
 function Set-WTFont {
     param([string]$FontName = "JetBrainsMonoNL Nerd Font")
