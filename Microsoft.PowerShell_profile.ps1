@@ -197,20 +197,3 @@ if ($env:WT_SESSION) {
 if ($env:TERM_PROGRAM -eq 'vscode') {
     Set-VSCodeFont
 }
-
-# --- System Info ---
-# Install and run Fastfetch for system stats
-if (-not (Get-Command fastfetch -ErrorAction SilentlyContinue)) {
-    Write-Host "Fastfetch not found. Installing..." -ForegroundColor Yellow
-    winget install Fastfetch-cli.Fastfetch -s winget --accept-source-agreements --accept-package-agreements
-}
-
-function Show-FastFetch {
-    if (Get-Command fastfetch -ErrorAction SilentlyContinue) {
-        # Run fastfetch with a custom structure to exclude the color palette
-        fastfetch --logo-position right --structure Title:Separator:OS:Host:Kernel:Uptime:Packages:Shell:Display:Terminal:CPU:GPU:Memory:Disk:Battery:LocalIP:Locale
-    }
-}
-Set-Alias sysinfo Show-FastFetch
-
-Show-FastFetch

@@ -6,7 +6,6 @@ This repository contains my personal PowerShell profile script, designed to enha
 
 ### 🎨 Appearance & Shell Configuration
 - **Oh My Posh**: Automatically checks for, installs (via `winget`), and initializes Oh My Posh for a rich prompt experience.
-- **Fastfetch**: Displays system statistics and Windows ASCII art on startup (installs via `winget` if missing).
 - **Nerd Fonts**: Detects if the **JetBrains Mono** Nerd Font is installed. If not, it installs it automatically.
 - **Windows Terminal Auto-Config**: If running inside Windows Terminal, it attempts to update the `settings.json` to use the installed Nerd Font automatically.
 - **IntelliSense**: Enables History-based Predictive IntelliSense with a ListView style (requires PowerShell 7+).
@@ -27,7 +26,6 @@ This repository contains my personal PowerShell profile script, designed to enha
 
 #### System & Utilities
 - `sudo <command>`: Run a command as Administrator.
-- `sysinfo`: Displays system information using Fastfetch.
 - `Clear-PSHistory`: Clears both in-memory and persistent PSReadLine history.
 - `grep`: Alias for `Select-String`.
 - `which`: Alias for `Get-Command`.
