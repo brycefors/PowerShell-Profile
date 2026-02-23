@@ -8,6 +8,7 @@ This repository contains my personal PowerShell profile script, designed to enha
 - **Oh My Posh**: Automatically checks for, installs (via `winget`), and initializes Oh My Posh for a rich prompt experience.
 - **Nerd Fonts**: Detects if the **JetBrains Mono** Nerd Font is installed. If not, it installs it automatically.
 - **Windows Terminal Auto-Config**: If running inside Windows Terminal, it attempts to update the `settings.json` to use the installed Nerd Font automatically.
+- **VS Code Auto-Config**: If running inside VS Code, it attempts to update the `settings.json` to use the installed Nerd Font automatically.
 - **IntelliSense**: Enables History-based Predictive IntelliSense with a ListView style (requires PowerShell 7+).
 - **Tab Completion**: Sets `Tab` key to `MenuComplete` for a navigable menu of options.
 
@@ -26,6 +27,8 @@ This repository contains my personal PowerShell profile script, designed to enha
 
 #### System & Utilities
 - `sudo <command>`: Run a command as Administrator.
+- `reboot`: Reboot the computer with a 5-second countdown (cancellable).
+- `lock` (alias `l`): Lock the workstation and turn off monitors with a 5-second countdown (cancellable).
 - `Clear-PSHistory`: Clears both in-memory and persistent PSReadLine history.
 - `grep`: Alias for `Select-String`.
 - `which`: Alias for `Get-Command`.
