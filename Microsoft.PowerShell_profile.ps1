@@ -14,8 +14,8 @@ if (-not (Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
     winget install JanDeDobbeleer.OhMyPosh -s winget --accept-source-agreements --accept-package-agreements
 }
 
-# Install Nerd Font (Meslo) if not found
-$fontName = "Meslo"
+# Install Nerd Font (JetBrainsMono) if not found
+$fontName = "JetBrainsMono"
 $fontReg = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts", "HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts"
 $isFontInstalled = $fontReg | ForEach-Object {
     $key = Get-Item $_ -ErrorAction SilentlyContinue
@@ -24,10 +24,10 @@ $isFontInstalled = $fontReg | ForEach-Object {
 
 if (-not $isFontInstalled -and (Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
     Write-Host "Nerd Font ($fontName) not found. Installing..." -ForegroundColor Yellow
-    oh-my-posh font install meslo
+    oh-my-posh font install $fontName
 }
 
-if ($PSVersionTable.PSVersion.Major -ge 6 -and (Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
+if ($PSVersionTable.PSVersion.Major -ge 6 -and (Get-Command oh-my-posh -ErrorAction SilentlyContinue) -and ($env:WT_SESSION -or $env:TERM_PROGRAM -eq 'vscode')) {
     oh-my-posh init pwsh | Invoke-Expression
 }
 
@@ -97,7 +97,7 @@ function sudo {
 
 # Set Windows Terminal Font
 function Set-WTFont {
-    param([string]$FontName = "MesloLGS Nerd Font")
+    param([string]$FontName = "JetBrainsMonoNL Nerd Font")
     $settingsPath = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
     
     if (-not (Test-Path $settingsPath)) { return }
@@ -120,6 +120,37 @@ function Set-WTFont {
     } catch {}
 }
 
+# Set VS Code Font
+function Set-VSCodeFont {
+    param([string]$FontName = "JetBrainsMonoNL Nerd Font")
+    $settingsPath = "$env:APPDATA\Code\User\settings.json"
+    
+    if (-not (Test-Path $settingsPath)) { return }
+    
+    try {
+        $jsonContent = Get-Content $settingsPath -Raw
+        $jsonContent = $jsonContent -replace '(?m)^\s*//.*$',''
+        $json = $jsonContent | ConvertFrom-Json
+        
+        if ($json.'terminal.integrated.fontFamily' -eq $FontName) { return }
+        
+        $json | Add-Member -MemberType NoteProperty -Name "terminal.integrated.fontFamily" -Value $FontName -Force
+        $json | ConvertTo-Json -Depth 20 | Set-Content $settingsPath -Encoding UTF8
+        Write-Host "VS Code font updated to '$FontName'. Reload window to see changes." -ForegroundColor Green
+    } catch {}
+}
+
+# Clear PSReadLine History
+function Clear-PSHistory {
+    $historyPath = (Get-PSReadLineOption).HistorySavePath
+    if (Test-Path $historyPath) {
+        Remove-Item $historyPath -Force
+        Write-Host "Persistent history deleted." -ForegroundColor Green
+    }
+    [Microsoft.PowerShell.PSConsoleReadLine]::ClearHistory()
+    Write-Host "In-memory history cleared." -ForegroundColor Green
+}
+
 Set-Alias grep Select-String
 Set-Alias which Get-Command
 
@@ -133,11 +164,35 @@ Set-Alias pro Edit-Profile
 
 # Reload profile
 function reload {
-    . $PROFILE
-    Write-Host "Profile reloaded." -ForegroundColor Green
+    try {
+        . $PROFILE
+        Write-Host "Profile reloaded from '$PROFILE'." -ForegroundColor Green
+    } catch {
+        Write-Error "Error reloading profile: $_"
+    }
 }
 
 # Auto-configure font if running in Windows Terminal
 if ($env:WT_SESSION) {
     Set-WTFont
 }
+if ($env:TERM_PROGRAM -eq 'vscode') {
+    Set-VSCodeFont
+}
+
+# --- System Info ---
+# Install and run Fastfetch for system stats
+if (-not (Get-Command fastfetch -ErrorAction SilentlyContinue)) {
+    Write-Host "Fastfetch not found. Installing..." -ForegroundColor Yellow
+    winget install Fastfetch-cli.Fastfetch -s winget --accept-source-agreements --accept-package-agreements
+}
+
+function Show-FastFetch {
+    if (Get-Command fastfetch -ErrorAction SilentlyContinue) {
+        # Run fastfetch with a custom structure to exclude the color palette
+        fastfetch --logo-position right --structure Title:Separator:OS:Host:Kernel:Uptime:Packages:Shell:Display:Terminal:CPU:GPU:Memory:Disk:Battery:LocalIP:Locale
+    }
+}
+Set-Alias sysinfo Show-FastFetch
+
+Show-FastFetch
