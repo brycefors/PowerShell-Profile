@@ -112,6 +112,23 @@ function global:reboot {
     Restart-Computer
 }
 
+$Global:RebootMarkerPath = "$env:TEMP\ps_scheduled_reboot.xml"
+
+function global:Get-PendingReboot {
+    if (-not (Test-Path $Global:RebootMarkerPath)) { return $null }
+    try {
+        $rebootTime = Import-Clixml $Global:RebootMarkerPath
+        $markerTime = (Get-Item $Global:RebootMarkerPath).LastWriteTime
+        $bootTime = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
+        
+        if ($bootTime -lt $markerTime -and $rebootTime -gt (Get-Date)) {
+            return $rebootTime
+        }
+    } catch {}
+    Remove-Item $Global:RebootMarkerPath -Force -ErrorAction SilentlyContinue
+    return $null
+}
+
 # Schedule a timed reboot
 function global:treboot {
     param([string]$Time = "3AM")
@@ -122,7 +139,7 @@ function global:treboot {
         
         shutdown.exe /r /t $seconds
         
-        $target | Export-Clixml -Path "$env:TEMP\ps_scheduled_reboot.xml" -Force
+        $target | Export-Clixml -Path $Global:RebootMarkerPath -Force
         Write-Host "Reboot scheduled for $($target.ToString())" -ForegroundColor Yellow
     } catch {
         Write-Error "Invalid time format (try '2AM', '16:30') or error scheduling."
@@ -132,8 +149,8 @@ function global:treboot {
 # Abort scheduled reboot
 function global:abort-reboot {
     shutdown.exe /a
-    if (Test-Path "$env:TEMP\ps_scheduled_reboot.xml") {
-        Remove-Item "$env:TEMP\ps_scheduled_reboot.xml" -Force
+    if (Test-Path $Global:RebootMarkerPath) {
+        Remove-Item $Global:RebootMarkerPath -Force
     }
     Write-Host "Scheduled reboot cancelled." -ForegroundColor Green
 }
@@ -306,18 +323,8 @@ if ($env:TERM_PROGRAM -eq 'vscode') {
 }
 
 # Check for scheduled reboot
-if (Test-Path "$env:TEMP\ps_scheduled_reboot.xml") {
-    try {
-        $rebootTime = Import-Clixml "$env:TEMP\ps_scheduled_reboot.xml"
-        $markerTime = (Get-Item "$env:TEMP\ps_scheduled_reboot.xml").LastWriteTime
-        $bootTime = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
-        if ($bootTime -lt $markerTime -and $rebootTime -gt (Get-Date)) {
-            Write-Host "WARNING: System is scheduled to reboot at $($rebootTime.ToString())" -ForegroundColor Red -BackgroundColor Black
-            Write-Host "Run 'abort-reboot' to cancel." -ForegroundColor Yellow
-        } else {
-            Remove-Item "$env:TEMP\ps_scheduled_reboot.xml" -Force
-        }
-    } catch {
-        Remove-Item "$env:TEMP\ps_scheduled_reboot.xml" -Force
-    }
+$pendingReboot = Get-PendingReboot
+if ($pendingReboot) {
+    Write-Host "WARNING: System is scheduled to reboot at $($pendingReboot.ToString())" -ForegroundColor Red -BackgroundColor Black
+    Write-Host "Run 'abort-reboot' to cancel." -ForegroundColor Yellow
 }
