@@ -90,8 +90,39 @@ function global:unzip {
 # --- System Utilities ---
 # Run as Administrator
 function global:sudo {
-    param([Parameter(Mandatory)][string]$Command, [Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
-    Start-Process -FilePath $Command -ArgumentList $Arguments -Verb RunAs
+    param([string]$Command, [Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
+    
+    # Install gsudo (sudo for Windows) if not found
+    if (-not (Get-Command gsudo -ErrorAction SilentlyContinue)) {
+        Write-Host "gsudo not found. Installing..." -ForegroundColor Yellow
+        winget install gerardog.gsudo -s winget --accept-source-agreements --accept-package-agreements
+    }
+
+    $cmd = if ($Command) { Get-Command $Command -ErrorAction SilentlyContinue | Select-Object -First 1 } else { $null }
+    $isPsCmd = $cmd -and $cmd.CommandType -ne 'Application'
+    $hasGsudo = [bool](Get-Command gsudo -ErrorAction SilentlyContinue)
+
+    if ($hasGsudo) {
+        if (-not $Command) {
+            gsudo
+        } elseif ($isPsCmd) {
+            $shell = (Get-Process -Id $PID).Path
+            $argList = ($Arguments | ForEach-Object { "`"$_`"" }) -join ' '
+            gsudo $shell -NoExit -Command "& { $Command $argList }"
+        } else {
+            gsudo $Command $Arguments
+        }
+    } else {
+        $shell = (Get-Process -Id $PID).Path
+        if (-not $Command) {
+            Start-Process -FilePath $shell -Verb RunAs -WorkingDirectory $PWD
+        } elseif ($isPsCmd) {
+            $argList = ($Arguments | ForEach-Object { "`"$_`"" }) -join ' '
+            Start-Process -FilePath $shell -ArgumentList "-NoExit", "-Command", "& { $Command $argList }" -Verb RunAs -WorkingDirectory $PWD
+        } else {
+            Start-Process -FilePath $Command -ArgumentList $Arguments -Verb RunAs -WorkingDirectory $PWD
+        }
+    }
 }
 
 # Reboot the computer

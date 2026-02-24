@@ -26,7 +26,7 @@ This repository contains my personal PowerShell profile script, designed to enha
 - `unzip <path> [destination]`: Extract a zip file (defaults to current directory).
 
 #### System & Utilities
-- `sudo <command>`: Run a command as Administrator.
+- `sudo [command]`: Run a command as Administrator (or elevate current shell if no command provided).
 - `reboot`: Reboot the computer with a 5-second countdown (cancellable).
 - `treboot [time]`: Schedule a reboot at a specific time (defaults to 3AM).
 - `abort-reboot`: Cancel a scheduled reboot.
@@ -64,6 +64,7 @@ New-Item -ItemType SymbolicLink -Path $PROFILE -Value "$PWD\Microsoft.PowerShell
 
 - **PowerShell**: Supports Windows PowerShell 5.1 and PowerShell 7+ (Core).
 - **Winget**: Required for the automatic installation of Oh My Posh.
+- **gsudo**: Recommended for inline `sudo` elevation (installed automatically if missing).
 - **Windows Terminal**: Recommended for full font and glyph support.
 
 > **Note**: The script modifies Windows Terminal settings (`settings.json`) to apply the font. It creates a backup of the settings implicitly by how `Set-Content` works, but reviewing the `Set-WTFont` function is recommended before running.
