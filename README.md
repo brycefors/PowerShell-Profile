@@ -28,6 +28,8 @@ This repository contains my personal PowerShell profile script, designed to enha
 #### System & Utilities
 - `sudo <command>`: Run a command as Administrator.
 - `reboot`: Reboot the computer with a 5-second countdown (cancellable).
+- `treboot [time]`: Schedule a reboot at a specific time (defaults to 3AM).
+- `abort-reboot`: Cancel a scheduled reboot.
 - `lock` (alias `l`): Lock the workstation and turn off monitors with a 5-second countdown (cancellable).
 - `Clear-PSHistory`: Clears both in-memory and persistent PSReadLine history.
 - **Winget Completion**: Registers native argument completion for `winget`.

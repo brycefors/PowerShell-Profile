@@ -112,6 +112,32 @@ function global:reboot {
     Restart-Computer
 }
 
+# Schedule a timed reboot
+function global:treboot {
+    param([string]$Time = "3AM")
+    try {
+        $target = Get-Date $Time
+        if ($target -lt (Get-Date)) { $target = $target.AddDays(1) }
+        $seconds = [int]($target - (Get-Date)).TotalSeconds
+        
+        shutdown.exe /r /t $seconds
+        
+        $target | Export-Clixml -Path "$env:TEMP\ps_scheduled_reboot.xml" -Force
+        Write-Host "Reboot scheduled for $($target.ToString())" -ForegroundColor Yellow
+    } catch {
+        Write-Error "Invalid time format (try '2AM', '16:30') or error scheduling."
+    }
+}
+
+# Abort scheduled reboot
+function global:abort-reboot {
+    shutdown.exe /a
+    if (Test-Path "$env:TEMP\ps_scheduled_reboot.xml") {
+        Remove-Item "$env:TEMP\ps_scheduled_reboot.xml" -Force
+    }
+    Write-Host "Scheduled reboot cancelled." -ForegroundColor Green
+}
+
 # Lock the computer and turn off monitors
 function global:lock {
     Write-Host "Locking in 5 seconds... Press any key to cancel." -ForegroundColor Yellow
@@ -277,4 +303,19 @@ if ($env:WT_SESSION) {
 }
 if ($env:TERM_PROGRAM -eq 'vscode') {
     Set-VSCodeFont
+}
+
+# Check for scheduled reboot
+if (Test-Path "$env:TEMP\ps_scheduled_reboot.xml") {
+    try {
+        $rebootTime = Import-Clixml "$env:TEMP\ps_scheduled_reboot.xml"
+        if ($rebootTime -gt (Get-Date)) {
+            Write-Host "WARNING: System is scheduled to reboot at $($rebootTime.ToString())" -ForegroundColor Red -BackgroundColor Black
+            Write-Host "Run 'abort-reboot' to cancel." -ForegroundColor Yellow
+        } else {
+            Remove-Item "$env:TEMP\ps_scheduled_reboot.xml" -Force
+        }
+    } catch {
+        Remove-Item "$env:TEMP\ps_scheduled_reboot.xml" -Force
+    }
 }
