@@ -309,7 +309,9 @@ if ($env:TERM_PROGRAM -eq 'vscode') {
 if (Test-Path "$env:TEMP\ps_scheduled_reboot.xml") {
     try {
         $rebootTime = Import-Clixml "$env:TEMP\ps_scheduled_reboot.xml"
-        if ($rebootTime -gt (Get-Date)) {
+        $markerTime = (Get-Item "$env:TEMP\ps_scheduled_reboot.xml").LastWriteTime
+        $bootTime = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
+        if ($bootTime -lt $markerTime -and $rebootTime -gt (Get-Date)) {
             Write-Host "WARNING: System is scheduled to reboot at $($rebootTime.ToString())" -ForegroundColor Red -BackgroundColor Black
             Write-Host "Run 'abort-reboot' to cancel." -ForegroundColor Yellow
         } else {
