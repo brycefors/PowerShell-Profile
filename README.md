@@ -30,9 +30,19 @@ This repository contains my personal PowerShell profile script, designed to enha
 - `reboot`: Reboot the computer with a 5-second countdown (cancellable).
 - `lock` (alias `l`): Lock the workstation and turn off monitors with a 5-second countdown (cancellable).
 - `Clear-PSHistory`: Clears both in-memory and persistent PSReadLine history.
-- `grep`: Alias for `Select-String`.
-- `which`: Alias for `Get-Command`.
 - **Winget Completion**: Registers native argument completion for `winget`.
+
+#### Unix Compatibility
+- `grep`: Alias for `Select-String`.
+- `open`: Alias for `Invoke-Item`.
+- `which <name>`: Returns the source path of a command.
+- `df`: View disk volume information.
+- `du [path]`: Calculate directory size.
+- `free`: Display memory usage (Total/Free).
+- `uptime`: Show system uptime.
+- `head [file]`: Display first 10 lines (supports pipeline).
+- `tail [file]`: Display last 10 lines (supports pipeline).
+- `wc [file]`: Count lines, words, and characters (supports pipeline).
 
 #### Profile Management
 - `pro`: Edit the profile script (launches VS Code if available, falls back to Notepad).

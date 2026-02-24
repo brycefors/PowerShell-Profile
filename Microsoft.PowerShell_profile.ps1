@@ -1,12 +1,9 @@
-# --- Shell Configuration ---
+# --- Dependencies & Setup ---
 # Install PSReadLine if missing
 if (-not (Get-Module -ListAvailable PSReadLine)) {
     Write-Host "PSReadLine not found. Installing..." -ForegroundColor Yellow
     Install-Module PSReadLine -Force -Scope CurrentUser
 }
-
-# Shows navigable menu of all options when hitting Tab
-Set-PSReadlineKeyHandler -Key Tab -Function MenuComplete
 
 # Install and Enable Oh My Posh
 if (-not (Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
@@ -27,8 +24,23 @@ if (-not $isFontInstalled -and (Get-Command oh-my-posh -ErrorAction SilentlyCont
     oh-my-posh font install $fontName
 }
 
+# --- Shell Initialization ---
+# Shows navigable menu of all options when hitting Tab
+Set-PSReadlineKeyHandler -Key Tab -Function MenuComplete
+
 if ($PSVersionTable.PSVersion.Major -ge 6 -and (Get-Command oh-my-posh -ErrorAction SilentlyContinue) -and ($env:WT_SESSION -or $env:TERM_PROGRAM -eq 'vscode')) {
-    oh-my-posh init pwsh | Invoke-Expression
+    $themeUrl = "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/blue-owl.omp.json"
+    $themeDir = "$env:LOCALAPPDATA\oh-my-posh\themes"
+    if ($env:POSH_THEMES_PATH) { $themeDir = $env:POSH_THEMES_PATH }
+    if (-not (Test-Path $themeDir)) { New-Item -ItemType Directory -Path $themeDir -Force | Out-Null }
+
+    $themeName = Split-Path $themeUrl -Leaf
+    $themePath = Join-Path $themeDir $themeName
+    if (-not (Test-Path $themePath)) {
+        Write-Host "Downloading Oh My Posh theme ($themeName)..." -ForegroundColor Yellow
+        Invoke-WebRequest $themeUrl -OutFile $themePath
+    }
+    oh-my-posh init pwsh --config $themePath | Invoke-Expression
 }
 
 # Enable Predictive IntelliSense (History based)
@@ -37,26 +49,13 @@ try {
     Set-PSReadLineOption -PredictionViewStyle ListView
 } catch {}
 
-
-# --- Completions ---
-# Register winget autocomplete
-Register-ArgumentCompleter -Native -CommandName winget -ScriptBlock {
-    param($wordToComplete, $commandAst, $cursorPosition)
-        [Console]::InputEncoding = [Console]::OutputEncoding = $OutputEncoding = [System.Text.Utf8Encoding]::new()
-        $Local:word = $wordToComplete.Replace('"', '""')
-        $Local:ast = $commandAst.ToString().Replace('"', '""')
-        winget complete --word="$Local:word" --commandline "$Local:ast" --position $cursorPosition | ForEach-Object {
-            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
-        }
-}
-
 # --- Navigation ---
 # Quick Navigation
-function .. { Set-Location .. }
-function ... { Set-Location ..\.. }
+function global:.. { Set-Location .. }
+function global:... { Set-Location ..\.. }
 
 # Create directory and enter it
-function mk {
+function global:mk {
     param([Parameter(Mandatory)][string]$Path)
     New-Item -ItemType Directory -Path $Path -Force | Out-Null
     Set-Location $Path
@@ -64,10 +63,10 @@ function mk {
 
 # --- File Operations ---
 # List files (force)
-function ll { Get-ChildItem -Force @args }
+function global:ll { Get-ChildItem -Force @args }
 
 # Create new file or update timestamp
-function touch {
+function global:touch {
     param([Parameter(Mandatory)][string]$Path)
     if (Test-Path $Path) {
         (Get-Item $Path).LastWriteTime = Get-Date
@@ -77,26 +76,26 @@ function touch {
 }
 
 # Find file recursively
-function ff {
+function global:ff {
     param([Parameter(Mandatory)][string]$Name)
     Get-ChildItem -Recurse -Filter "*$Name*" -ErrorAction SilentlyContinue
 }
 
 # Extract zip file
-function unzip {
+function global:unzip {
     param([Parameter(Mandatory)][string]$Path, [string]$Destination = ".")
     Expand-Archive -Path $Path -DestinationPath $Destination -Force
 }
 
-# --- System & Utilities ---
+# --- System Utilities ---
 # Run as Administrator
-function sudo {
+function global:sudo {
     param([Parameter(Mandatory)][string]$Command, [Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
     Start-Process -FilePath $Command -ArgumentList $Arguments -Verb RunAs
 }
 
 # Reboot the computer
-function reboot {
+function global:reboot {
     Write-Host "Rebooting in 5 seconds... Press any key to cancel." -ForegroundColor Yellow
     for ($i = 5; $i -gt 0; $i--) {
         Write-Host -NoNewline "$i... "
@@ -114,7 +113,7 @@ function reboot {
 }
 
 # Lock the computer and turn off monitors
-function lock {
+function global:lock {
     Write-Host "Locking in 5 seconds... Press any key to cancel." -ForegroundColor Yellow
     for ($i = 5; $i -gt 0; $i--) {
         Write-Host -NoNewline "$i... "
@@ -134,10 +133,63 @@ function lock {
     }
     [Win32Functions.Win32SendMessage]::SendMessage(0xFFFF, 0x0112, 0xF170, 2) | Out-Null
 }
-Set-Alias l lock
+Set-Alias l lock -Scope Global
 
+# Clear PSReadLine History
+function global:Clear-PSHistory {
+    $historyPath = (Get-PSReadLineOption).HistorySavePath
+    if (Test-Path $historyPath) {
+        Remove-Item $historyPath -Force
+        Write-Host "Persistent history deleted." -ForegroundColor Green
+    }
+    [Microsoft.PowerShell.PSConsoleReadLine]::ClearHistory()
+    Write-Host "In-memory history cleared." -ForegroundColor Green
+}
+
+# --- Unix Compatibility ---
+Set-Alias grep Select-String -Scope Global
+Set-Alias open Invoke-Item -Scope Global
+
+function global:which ([string]$Name) {
+    Get-Command $Name -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
+}
+
+function global:df { Get-Volume }
+
+function global:du {
+    param([string]$Path = ".")
+    $size = (Get-ChildItem $Path -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+    [PSCustomObject]@{ Path = (Resolve-Path $Path); Size = "{0:N2} MB" -f ($size / 1MB) }
+}
+
+function global:free {
+    Get-CimInstance Win32_OperatingSystem | Select-Object @{N="Total(GB)";E={"{0:N2}" -f ($_.TotalVisibleMemorySize / 1MB)}}, @{N="Free(GB)";E={"{0:N2}" -f ($_.FreePhysicalMemory / 1MB)}}
+}
+
+function global:uptime {
+    $boot = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
+    $uptime = (Get-Date) - $boot
+    "Up for $($uptime.Days)d $($uptime.Hours)h $($uptime.Minutes)m"
+}
+
+function global:head {
+    param([string[]]$Path, [int]$n = 10)
+    if ($Path) { Get-Content $Path -TotalCount $n } else { $input | Select-Object -First $n }
+}
+
+function global:tail {
+    param([string[]]$Path, [int]$n = 10)
+    if ($Path) { Get-Content $Path -Tail $n } else { $input | Select-Object -Last $n }
+}
+
+function global:wc {
+    param([string[]]$Path)
+    if ($Path) { Get-Content $Path | Measure-Object -Line -Word -Character } else { $input | Measure-Object -Line -Word -Character }
+}
+
+# --- Terminal Configuration ---
 # Set Windows Terminal Font
-function Set-WTFont {
+function global:Set-WTFont {
     param([string]$FontName = "JetBrainsMonoNL Nerd Font")
     $settingsPath = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
     
@@ -162,7 +214,7 @@ function Set-WTFont {
 }
 
 # Set VS Code Font
-function Set-VSCodeFont {
+function global:Set-VSCodeFont {
     param([string]$FontName = "JetBrainsMonoNL Nerd Font")
     $settingsPath = "$env:APPDATA\Code\User\settings.json"
     
@@ -181,38 +233,44 @@ function Set-VSCodeFont {
     } catch {}
 }
 
-# Clear PSReadLine History
-function Clear-PSHistory {
-    $historyPath = (Get-PSReadLineOption).HistorySavePath
-    if (Test-Path $historyPath) {
-        Remove-Item $historyPath -Force
-        Write-Host "Persistent history deleted." -ForegroundColor Green
-    }
-    [Microsoft.PowerShell.PSConsoleReadLine]::ClearHistory()
-    Write-Host "In-memory history cleared." -ForegroundColor Green
-}
-
-Set-Alias grep Select-String
-Set-Alias which Get-Command
-
 # --- Profile Management ---
 # Quick edit profile
-function Edit-Profile {
+function global:Edit-Profile {
     param([string]$Editor = 'code')
     if (Get-Command $Editor -ErrorAction SilentlyContinue) { & $Editor $PROFILE } else { notepad $PROFILE }
 }
-Set-Alias pro Edit-Profile
+Set-Alias pro Edit-Profile -Scope Global
 
 # Reload profile
-function reload {
-    try {
-        . $PROFILE
-        Write-Host "Profile reloaded from '$PROFILE'." -ForegroundColor Green
-    } catch {
-        Write-Error "Error reloading profile: $_"
+function global:Import-Profile {
+    @(
+        $Profile.AllUsersAllHosts,
+        $Profile.AllUsersCurrentHost,
+        $Profile.CurrentUserAllHosts,
+        $Profile.CurrentUserCurrentHost
+    ) | ForEach-Object {
+        if (Test-Path $_) {
+            Write-Verbose "Running $_"
+            . $_
+        }
     }
+    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Profiles reloaded." -ForegroundColor Green
+}
+Set-Alias reload Import-Profile -Scope Global
+
+# --- Completions ---
+# Register winget autocomplete
+Register-ArgumentCompleter -Native -CommandName winget -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+        [Console]::InputEncoding = [Console]::OutputEncoding = $OutputEncoding = [System.Text.Utf8Encoding]::new()
+        $Local:word = $wordToComplete.Replace('"', '""')
+        $Local:ast = $commandAst.ToString().Replace('"', '""')
+        winget complete --word="$Local:word" --commandline "$Local:ast" --position $cursorPosition | ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+        }
 }
 
+# --- Startup Execution ---
 # Auto-configure font if running in Windows Terminal
 if ($env:WT_SESSION) {
     Set-WTFont
