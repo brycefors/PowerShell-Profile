@@ -178,7 +178,7 @@ function global:treboot {
 }
 
 # Abort scheduled reboot
-function global:abort-reboot {
+function global:areboot {
     shutdown.exe /a
     if (Test-Path $Global:RebootMarkerPath) {
         Remove-Item $Global:RebootMarkerPath -Force
@@ -202,10 +202,10 @@ function global:lock {
     }
     Write-Host "`nLocking..." -ForegroundColor Red
     rundll32.exe user32.dll,LockWorkStation
-    if (-not ([System.Management.Automation.PSTypeName]'Win32Functions.Win32SendMessage').Type) {
-        Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern int SendMessage(int hWnd, int hMsg, int wParam, int lParam);' -Name "Win32SendMessage" -Namespace Win32Functions | Out-Null
+    if (-not ([System.Management.Automation.PSTypeName]'Win32Functions.Win32PowerControl').Type) {
+        Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern bool PostMessage(int hWnd, int hMsg, int wParam, int lParam);' -Name "Win32PowerControl" -Namespace Win32Functions | Out-Null
     }
-    [Win32Functions.Win32SendMessage]::SendMessage(0xFFFF, 0x0112, 0xF170, 2) | Out-Null
+    [Win32Functions.Win32PowerControl]::PostMessage(0xFFFF, 0x0112, 0xF170, 2) | Out-Null
 }
 Set-Alias l lock -Scope Global
 
