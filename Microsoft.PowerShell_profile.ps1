@@ -357,5 +357,5 @@ if ($env:TERM_PROGRAM -eq 'vscode') {
 $pendingReboot = Get-PendingReboot
 if ($pendingReboot) {
     Write-Host "WARNING: System is scheduled to reboot at $($pendingReboot.ToString())" -ForegroundColor Red -BackgroundColor Black
-    Write-Host "Run 'abort-reboot' to cancel." -ForegroundColor Yellow
+    Write-Host "Run 'areboot' to cancel." -ForegroundColor Yellow
 }
