@@ -1,34 +1,11 @@
-# --- Dependencies & Setup ---
-# Install PSReadLine if missing
-if (-not (Get-Module -ListAvailable PSReadLine)) {
-    Write-Host "PSReadLine not found. Installing..." -ForegroundColor Yellow
-    Install-Module PSReadLine -Force -Scope CurrentUser
-}
-
-# Install and Enable Oh My Posh
-if (-not (Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
-    Write-Host "Oh My Posh not found. Installing..." -ForegroundColor Yellow
-    winget install JanDeDobbeleer.OhMyPosh -s winget --accept-source-agreements --accept-package-agreements
-}
-
-# Install Nerd Font (JetBrainsMono) if not found
-$fontName = "JetBrainsMono"
-$fontReg = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts", "HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts"
-$isFontInstalled = $fontReg | ForEach-Object {
-    $key = Get-Item $_ -ErrorAction SilentlyContinue
-    if ($key) { $key.GetValueNames() }
-} | Where-Object { $_ -like "*$fontName*" }
-
-if (-not $isFontInstalled -and (Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
-    Write-Host "Nerd Font ($fontName) not found. Installing..." -ForegroundColor Yellow
-    oh-my-posh font install $fontName
-}
+# Cache oh-my-posh command once to avoid repeated slow Get-Command calls
+$_ompCmd = Get-Command oh-my-posh -ErrorAction SilentlyContinue
 
 # --- Shell Initialization ---
 # Shows navigable menu of all options when hitting Tab
 Set-PSReadlineKeyHandler -Key Tab -Function MenuComplete
 
-if ($PSVersionTable.PSVersion.Major -ge 6 -and (Get-Command oh-my-posh -ErrorAction SilentlyContinue) -and ($env:WT_SESSION -or $env:TERM_PROGRAM -eq 'vscode')) {
+if ($PSVersionTable.PSVersion.Major -ge 6 -and $_ompCmd -and ($env:WT_SESSION -or $env:TERM_PROGRAM -eq 'vscode')) {
     $themeUrl = "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/blue-owl.omp.json"
     $themeDir = "$env:LOCALAPPDATA\oh-my-posh\themes"
     if ($env:POSH_THEMES_PATH) { $themeDir = $env:POSH_THEMES_PATH }
@@ -40,7 +17,14 @@ if ($PSVersionTable.PSVersion.Major -ge 6 -and (Get-Command oh-my-posh -ErrorAct
         Write-Host "Downloading Oh My Posh theme ($themeName)..." -ForegroundColor Yellow
         Invoke-WebRequest $themeUrl -OutFile $themePath
     }
-    oh-my-posh init pwsh --config $themePath | Invoke-Expression
+
+    # Cache the init script; only regenerate when oh-my-posh is updated
+    $ompInitScript = "$env:TEMP\omp_init.ps1"
+    if (-not (Test-Path $ompInitScript) -or
+        ($_ompCmd.Source -and (Get-Item $_ompCmd.Source).LastWriteTime -gt (Get-Item $ompInitScript).LastWriteTime)) {
+        oh-my-posh init pwsh --config $themePath | Set-Content $ompInitScript -Encoding UTF8
+    }
+    . $ompInitScript
 }
 
 # Enable Predictive IntelliSense (History based)
@@ -267,7 +251,8 @@ function global:Set-WTAppearance {
     param(
         [string]$FontName = "JetBrainsMonoNL Nerd Font",
         [double]$Opacity = 0.8,
-        [bool]$UseAcrylic = $true
+        [bool]$UseAcrylic = $true,
+        [bool]$UseAcrylicInTabRow = $true
     )
     $settingsPath = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
     
@@ -287,12 +272,14 @@ function global:Set-WTAppearance {
         if ($json.profiles.defaults.font.face -ne $FontName) { $needUpdate = $true }
         if ($json.profiles.defaults.useAcrylic -ne $UseAcrylic) { $needUpdate = $true }
         if ($json.profiles.defaults.acrylicOpacity -ne $Opacity) { $needUpdate = $true }
+        if ($json.useAcrylicInTabRow -ne $UseAcrylicInTabRow) { $needUpdate = $true }
 
         if (-not $needUpdate) { return }
 
         $json.profiles.defaults.font | Add-Member -MemberType NoteProperty -Name "face" -Value $FontName -Force
         $json.profiles.defaults | Add-Member -MemberType NoteProperty -Name "useAcrylic" -Value $UseAcrylic -Force
         $json.profiles.defaults | Add-Member -MemberType NoteProperty -Name "acrylicOpacity" -Value $Opacity -Force
+        $json | Add-Member -MemberType NoteProperty -Name "useAcrylicInTabRow" -Value $UseAcrylicInTabRow -Force
         $json | ConvertTo-Json -Depth 20 | Set-Content $settingsPath -Encoding UTF8
         Write-Host "Windows Terminal appearance updated. Restart Terminal to see changes." -ForegroundColor Green
     } catch {}
@@ -357,11 +344,24 @@ Register-ArgumentCompleter -Native -CommandName winget -ScriptBlock {
 
 # --- Startup Execution ---
 # Auto-configure font if running in Windows Terminal
+# Stamp files prevent reading/writing JSON settings on every startup
 if ($env:WT_SESSION) {
-    Set-WTAppearance
+    $wtStamp   = "$env:TEMP\wt_appearance.stamp"
+    $wtSettings = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
+    if (-not (Test-Path $wtStamp) -or
+        ((Test-Path $wtSettings) -and (Get-Item $wtSettings).LastWriteTime -gt (Get-Item $wtStamp).LastWriteTime)) {
+        Set-WTAppearance
+        Get-Date | Set-Content $wtStamp
+    }
 }
 if ($env:TERM_PROGRAM -eq 'vscode') {
-    Set-VSCodeFont
+    $vsStamp   = "$env:TEMP\vscode_font.stamp"
+    $vsSettings = "$env:APPDATA\Code\User\settings.json"
+    if (-not (Test-Path $vsStamp) -or
+        ((Test-Path $vsSettings) -and (Get-Item $vsSettings).LastWriteTime -gt (Get-Item $vsStamp).LastWriteTime)) {
+        Set-VSCodeFont
+        Get-Date | Set-Content $vsStamp
+    }
 }
 
 # Check for scheduled reboot
