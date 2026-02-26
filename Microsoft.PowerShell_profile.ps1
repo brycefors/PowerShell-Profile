@@ -262,9 +262,13 @@ function global:wc {
 }
 
 # --- Terminal Configuration ---
-# Set Windows Terminal Font
-function global:Set-WTFont {
-    param([string]$FontName = "JetBrainsMonoNL Nerd Font")
+# Set Windows Terminal Appearance
+function global:Set-WTAppearance {
+    param(
+        [string]$FontName = "JetBrainsMonoNL Nerd Font",
+        [double]$Opacity = 0.8,
+        [bool]$UseAcrylic = $true
+    )
     $settingsPath = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
     
     if (-not (Test-Path $settingsPath)) { return }
@@ -278,12 +282,19 @@ function global:Set-WTFont {
         if (-not $json.profiles.defaults) { $json.profiles | Add-Member -MemberType NoteProperty -Name "defaults" -Value ([PSCustomObject]@{}) }
         if (-not $json.profiles.defaults.font) { $json.profiles.defaults | Add-Member -MemberType NoteProperty -Name "font" -Value ([PSCustomObject]@{}) }
         
-        # Only update if different
-        if ($json.profiles.defaults.font.face -eq $FontName) { return }
-        
+        # Check if update is needed
+        $needUpdate = $false
+        if ($json.profiles.defaults.font.face -ne $FontName) { $needUpdate = $true }
+        if ($json.profiles.defaults.useAcrylic -ne $UseAcrylic) { $needUpdate = $true }
+        if ($json.profiles.defaults.acrylicOpacity -ne $Opacity) { $needUpdate = $true }
+
+        if (-not $needUpdate) { return }
+
         $json.profiles.defaults.font | Add-Member -MemberType NoteProperty -Name "face" -Value $FontName -Force
+        $json.profiles.defaults | Add-Member -MemberType NoteProperty -Name "useAcrylic" -Value $UseAcrylic -Force
+        $json.profiles.defaults | Add-Member -MemberType NoteProperty -Name "acrylicOpacity" -Value $Opacity -Force
         $json | ConvertTo-Json -Depth 20 | Set-Content $settingsPath -Encoding UTF8
-        Write-Host "Windows Terminal font updated to '$FontName'. Restart Terminal to see changes." -ForegroundColor Green
+        Write-Host "Windows Terminal appearance updated. Restart Terminal to see changes." -ForegroundColor Green
     } catch {}
 }
 
@@ -347,7 +358,7 @@ Register-ArgumentCompleter -Native -CommandName winget -ScriptBlock {
 # --- Startup Execution ---
 # Auto-configure font if running in Windows Terminal
 if ($env:WT_SESSION) {
-    Set-WTFont
+    Set-WTAppearance
 }
 if ($env:TERM_PROGRAM -eq 'vscode') {
     Set-VSCodeFont
