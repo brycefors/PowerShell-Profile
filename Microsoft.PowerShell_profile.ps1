@@ -307,7 +307,7 @@ function global:Get-NetworkSummary {
         Where-Object { $_.NetworkInterfaceType -ne 'Loopback' -and $_.NetworkInterfaceType -ne 'Tunnel' } |
         Sort-Object { if ($_.OperationalStatus -eq 'Up') { 0 } else { 1 } }
 
-    $seenMacs = [System.Collections.Generic.HashSet[string]]::new()
+    $seenMacs = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
 
     foreach ($iface in $interfaces) {
         $macClean = $iface.GetPhysicalAddress().ToString()
