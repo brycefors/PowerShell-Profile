@@ -7,7 +7,7 @@ This repository contains my personal PowerShell profile script, designed to enha
 ### 🎨 Appearance & Shell Configuration
 - **Oh My Posh**: Automatically checks for, installs (via `winget`), and initializes Oh My Posh for a rich prompt experience.
 - **Nerd Fonts**: Configures **JetBrains Mono** Nerd Font as the default font if running in a supported terminal.
-- **Windows Terminal Auto-Config**: If running inside Windows Terminal, it attempts to update the `settings.json` to use the installed Nerd Font automatically.
+- **Windows Terminal Auto-Config**: If running inside Windows Terminal, it attempts to update the `settings.json` to use the installed Nerd Font automatically. You can also run `Set-WTAppearance -Opacity 0.85 -UseAcrylic $true` to customize the look.
 - **VS Code Auto-Config**: If running inside VS Code, it attempts to update the `settings.json` to use the installed Nerd Font automatically.
 - **IntelliSense**: Enables History-based Predictive IntelliSense with a ListView style (requires PowerShell 7+).
 - **Tab Completion**: Sets `Tab` key to `MenuComplete` for a navigable menu of options.
@@ -46,6 +46,7 @@ This repository contains my personal PowerShell profile script, designed to enha
 - `du [path]`: Alias for `Get-DirectorySize`. Calculate directory size.
 - `free`: Alias for `Get-MemoryUsage`. Display memory usage (Total/Free).
 - `uptime`: Alias for `Get-SystemUptime`. Show system uptime.
+- `ip`: Alias for `Get-NetworkSummary`. Display a detailed, colored summary of network interfaces, IPs, and DNS.
 - `head [file]`: Alias for `Get-ContentHead`. Display first 10 lines (supports pipeline).
 - `tail [file]`: Alias for `Get-ContentTail`. Display last 10 lines (supports pipeline).
 - `wc [file]`: Alias for `Measure-Content`. Count lines, words, and characters (supports pipeline).
@@ -68,6 +69,7 @@ This repository contains my personal PowerShell profile script, designed to enha
 #### Profile Management
 - `pro`: Edit the profile script (launches VS Code if available, falls back to Notepad).
 - `reload`: Reload the profile script in the current session and clears cached configuration stamps.
+- `pull-profile`: Alias for `Update-ProfileFromRemote`. Downloads the latest profile version from GitHub and reloads it.
 
 ## Installation
 
@@ -85,5 +87,6 @@ New-Item -ItemType SymbolicLink -Path $PROFILE -Value "$PWD\Microsoft.PowerShell
 - **Winget**: Required for the automatic installation of Oh My Posh.
 - **gsudo**: Recommended for inline `sudo` elevation (installed automatically if missing).
 - **Windows Terminal**: Recommended for full font and glyph support.
+- **JetBrains Mono Nerd Font**: The profile configures the terminal to use `JetBrainsMonoNL Nerd Font`.
 
 > **Note**: The script modifies Windows Terminal settings (`settings.json`) to apply the font. It does **not** create a backup of the settings, so reviewing the `Set-WTAppearance` function is recommended before running.
