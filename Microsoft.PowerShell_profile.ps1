@@ -448,14 +448,22 @@ function global:Set-WTAppearance {
         $needUpdate = $false
         if ($json.profiles.defaults.font.face -ne $FontName) { $needUpdate = $true }
         if ($json.profiles.defaults.useAcrylic -ne $UseAcrylic) { $needUpdate = $true }
-        if ($json.profiles.defaults.acrylicOpacity -ne $Opacity) { $needUpdate = $true }
+        if ($UseAcrylic) {
+            if ($json.profiles.defaults.acrylicOpacity -ne $Opacity) { $needUpdate = $true }
+        } else {
+            if ($json.profiles.defaults.opacity -ne $Opacity) { $needUpdate = $true }
+        }
         if ($json.useAcrylicInTabRow -ne $UseAcrylicInTabRow) { $needUpdate = $true }
 
         if (-not $needUpdate) { return }
 
         $json.profiles.defaults.font | Add-Member -MemberType NoteProperty -Name "face" -Value $FontName -Force
         $json.profiles.defaults | Add-Member -MemberType NoteProperty -Name "useAcrylic" -Value $UseAcrylic -Force
-        $json.profiles.defaults | Add-Member -MemberType NoteProperty -Name "acrylicOpacity" -Value $Opacity -Force
+        if ($UseAcrylic) {
+            $json.profiles.defaults | Add-Member -MemberType NoteProperty -Name "acrylicOpacity" -Value $Opacity -Force
+        } else {
+            $json.profiles.defaults | Add-Member -MemberType NoteProperty -Name "opacity" -Value $Opacity -Force
+        }
         $json | Add-Member -MemberType NoteProperty -Name "useAcrylicInTabRow" -Value $UseAcrylicInTabRow -Force
         $json | ConvertTo-Json -Depth 20 | Set-Content $settingsPath -Encoding UTF8
         Write-Host "Windows Terminal appearance updated. Restart Terminal to see changes." -ForegroundColor Green
