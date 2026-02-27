@@ -447,10 +447,12 @@ function global:Set-WTAppearance {
         # Check if update is needed
         $needUpdate = $false
         if ($json.profiles.defaults.font.face -ne $FontName) { $needUpdate = $true }
-        if ($json.profiles.defaults.useAcrylic -ne $UseAcrylic) { $needUpdate = $true }
         if ($UseAcrylic) {
+            if ($json.profiles.defaults.useAcrylic -ne $true) { $needUpdate = $true }
             if ($json.profiles.defaults.acrylicOpacity -ne $Opacity) { $needUpdate = $true }
         } else {
+            if ($json.profiles.defaults.PSObject.Properties['useAcrylic']) { $needUpdate = $true }
+            if ($json.profiles.defaults.PSObject.Properties['acrylicOpacity']) { $needUpdate = $true }
             $intOpacity = if ($Opacity -le 1.0) { [int]($Opacity * 100) } else { $Opacity }
             if ($json.profiles.defaults.opacity -ne $intOpacity) { $needUpdate = $true }
         }
@@ -459,10 +461,12 @@ function global:Set-WTAppearance {
         if (-not $needUpdate) { return }
 
         $json.profiles.defaults.font | Add-Member -MemberType NoteProperty -Name "face" -Value $FontName -Force
-        $json.profiles.defaults | Add-Member -MemberType NoteProperty -Name "useAcrylic" -Value $UseAcrylic -Force
         if ($UseAcrylic) {
+            $json.profiles.defaults | Add-Member -MemberType NoteProperty -Name "useAcrylic" -Value $true -Force
             $json.profiles.defaults | Add-Member -MemberType NoteProperty -Name "acrylicOpacity" -Value $Opacity -Force
         } else {
+            if ($json.profiles.defaults.PSObject.Properties['useAcrylic']) { $json.profiles.defaults.PSObject.Properties.Remove('useAcrylic') }
+            if ($json.profiles.defaults.PSObject.Properties['acrylicOpacity']) { $json.profiles.defaults.PSObject.Properties.Remove('acrylicOpacity') }
             $intOpacity = if ($Opacity -le 1.0) { [int]($Opacity * 100) } else { $Opacity }
             $json.profiles.defaults | Add-Member -MemberType NoteProperty -Name "opacity" -Value $intOpacity -Force
         }
