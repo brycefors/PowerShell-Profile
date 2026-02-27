@@ -303,10 +303,20 @@ function global:Get-SystemUptime {
 Set-Alias uptime Get-SystemUptime -Scope Global
 
 function global:Get-NetworkSummary {
-    $interfaces = [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() | Where-Object { $_.NetworkInterfaceType -ne 'Loopback' -and $_.NetworkInterfaceType -ne 'Tunnel' }
+    $interfaces = [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() | 
+        Where-Object { $_.NetworkInterfaceType -ne 'Loopback' -and $_.NetworkInterfaceType -ne 'Tunnel' } |
+        Sort-Object { if ($_.OperationalStatus -eq 'Up') { 0 } else { 1 } }
+
+    $seenMacs = [System.Collections.Generic.HashSet[string]]::new()
+
     foreach ($iface in $interfaces) {
         $macClean = $iface.GetPhysicalAddress().ToString()
         if (-not $macClean) { continue }
+
+        if ($iface.OperationalStatus -ne 'Up') {
+            if ($seenMacs.Contains($macClean)) { continue }
+        }
+        $null = $seenMacs.Add($macClean)
 
         $props = $iface.GetIPProperties()
         $unicastV4 = $props.UnicastAddresses | Where-Object { $_.Address.AddressFamily -eq 'InterNetwork' }
