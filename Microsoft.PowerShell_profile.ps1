@@ -302,6 +302,67 @@ function global:Get-SystemUptime {
 }
 Set-Alias uptime Get-SystemUptime -Scope Global
 
+function global:Get-NetworkSummary {
+    $interfaces = [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() | Where-Object { $_.NetworkInterfaceType -ne 'Loopback' -and $_.NetworkInterfaceType -ne 'Tunnel' }
+    foreach ($iface in $interfaces) {
+        $macClean = $iface.GetPhysicalAddress().ToString()
+        if (-not $macClean) { continue }
+
+        $props = $iface.GetIPProperties()
+        $unicastV4 = $props.UnicastAddresses | Where-Object { $_.Address.AddressFamily -eq 'InterNetwork' }
+        if ($iface.OperationalStatus -eq 'Up' -and -not $unicastV4) { continue }
+        
+        $statColor = if ($iface.OperationalStatus -eq 'Up') { 'Green' } else { 'Red' }
+        Write-Host "[$($iface.Name)] " -NoNewline -ForegroundColor Magenta
+        Write-Host "($($iface.OperationalStatus))" -ForegroundColor $statColor
+        
+        $macDashed = $macClean -replace '(..)', '$1-' -replace '-$', ''
+        $macColon = $macClean -replace '(..)', '$1:' -replace ':$', ''
+        Write-Host "  MAC:      $macDashed / $macColon / $macClean" -ForegroundColor Gray
+
+        if ($iface.OperationalStatus -ne 'Up') {
+            Write-Host "  IPv4:     Disconnected" -ForegroundColor Red
+            Write-Host "  IPv6:     Disconnected" -ForegroundColor Red
+            Write-Host "  DNS:      Disconnected" -ForegroundColor Red
+        } else {
+            $v4Str = foreach ($ip in $unicastV4) {
+                $mask = $ip.IPv4Mask
+                $revDns = try { (Resolve-DnsName -Name $ip.Address.IPAddressToString -Type PTR -DnsOnly -QuickTimeout -ErrorAction SilentlyContinue).NameHost } catch {}
+                $revDnsStr = if ($revDns -and $revDns -ne $ip.Address.IPAddressToString) { " [$($revDns.TrimEnd('.'))]" } else { "" }
+
+                if ($mask) {
+                    $cidr = ($mask.GetAddressBytes() | ForEach-Object { [Convert]::ToString($_, 2).Replace('0','').Length } | Measure-Object -Sum).Sum
+                    "$($ip.Address)/$cidr ($mask)$revDnsStr"
+                } else {
+                    "$($ip.Address)$revDnsStr"
+                }
+            }
+
+            $resolve = {
+                param($ipObject)
+                $ipAddress = if ($ipObject -is [System.Net.IPAddress]) { $ipObject } else { $ipObject.Address }
+                $ipString = $ipAddress.IPAddressToString
+                
+                $revDns = try { (Resolve-DnsName -Name $ipString -Type PTR -DnsOnly -QuickTimeout -ErrorAction SilentlyContinue).NameHost } catch {}
+                $revDnsStr = if ($revDns -and $revDns -ne $ipString) { " [$($revDns.TrimEnd('.'))]" } else { "" }
+                "$ipString$revDnsStr"
+            }
+
+            $v6Str = ($props.UnicastAddresses | Where-Object { $_.Address.AddressFamily -eq 'InterNetworkV6' }) | ForEach-Object { & $resolve $_ }
+            $gwStr = ($props.GatewayAddresses) | ForEach-Object { & $resolve $_ }
+            $dnsStr = ($props.DnsAddresses) | ForEach-Object { & $resolve $_ }
+
+            $dhcp = try { if ($props.GetIPv4Properties().IsDhcpEnabled) { "DHCP" } else { "Static" } } catch { "Unknown" }
+            if ($v4Str) { Write-Host "  IPv4:     $($v4Str -join ', ') [$dhcp]" -ForegroundColor Cyan }
+            if ($v6Str) { Write-Host "  IPv6:     $($v6Str -join ', ')" -ForegroundColor DarkCyan }
+            if ($gwStr) { Write-Host "  Gateway:  $($gwStr -join ', ')" -ForegroundColor Yellow }
+            if ($dnsStr) { Write-Host "  DNS:      $($dnsStr -join ', ')" -ForegroundColor Green }
+        }
+        Write-Host ""
+    }
+}
+Set-Alias ip Get-NetworkSummary -Scope Global
+
 function global:Get-ContentHead {
     param([string[]]$Path, [int]$n = 10)
     if ($Path) { Get-Content $Path -TotalCount $n } else { $input | Select-Object -First $n }
