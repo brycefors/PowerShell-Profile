@@ -313,14 +313,12 @@ function global:Get-NetworkSummary {
         $macClean = $iface.GetPhysicalAddress().ToString()
         if (-not $macClean) { continue }
 
-        if ($iface.OperationalStatus -ne 'Up') {
-            if ($seenMacs.Contains($macClean)) { continue }
-        }
-        $null = $seenMacs.Add($macClean)
-
         $props = $iface.GetIPProperties()
         $unicastV4 = $props.UnicastAddresses | Where-Object { $_.Address.AddressFamily -eq 'InterNetwork' }
         if ($iface.OperationalStatus -eq 'Up' -and -not $unicastV4) { continue }
+
+        if ($seenMacs.Contains($macClean)) { continue }
+        $null = $seenMacs.Add($macClean)
         
         $statColor = if ($iface.OperationalStatus -eq 'Up') { 'Green' } else { 'Red' }
         Write-Host "[$($iface.Name)] " -NoNewline -ForegroundColor Magenta
