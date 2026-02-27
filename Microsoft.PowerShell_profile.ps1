@@ -323,6 +323,7 @@ function global:Get-NetworkSummary {
         $statColor = if ($iface.OperationalStatus -eq 'Up') { 'Green' } else { 'Red' }
         Write-Host "[$($iface.Name)] " -NoNewline -ForegroundColor Magenta
         Write-Host "($($iface.OperationalStatus))" -ForegroundColor $statColor
+        Write-Host "  Driver:   $($iface.Description)" -ForegroundColor DarkGray
         
         $macDashed = $macClean -replace '(..)', '$1-' -replace '-$', ''
         $macColon = $macClean -replace '(..)', '$1:' -replace ':$', ''
