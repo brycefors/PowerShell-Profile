@@ -36,18 +36,20 @@ function global:.. { Set-Location .. }
 function global:... { Set-Location ..\.. }
 
 # Create directory and enter it
-function global:mk {
+function global:New-DirectoryAndEnter {
     param([Parameter(Mandatory)][string]$Path)
     $null = New-Item -ItemType Directory -Path $Path -Force
     Set-Location $Path
 }
+Set-Alias mk New-DirectoryAndEnter -Scope Global
 
 # --- File Operations ---
 # List files (force)
-function global:ll { Get-ChildItem -Force @args }
+function global:Get-ChildItemForce { Get-ChildItem -Force @args }
+Set-Alias ll Get-ChildItemForce -Scope Global
 
 # Create new file or update timestamp
-function global:touch {
+function global:Update-FileTimestamp {
     param([Parameter(Mandatory)][string]$Path)
     if (Test-Path $Path) {
         (Get-Item $Path).LastWriteTime = Get-Date
@@ -55,28 +57,39 @@ function global:touch {
         $null = New-Item -ItemType File -Path $Path -Force
     }
 }
+Set-Alias touch Update-FileTimestamp -Scope Global
 
 # Find file recursively
-function global:ff {
+function global:Find-File {
     param([Parameter(Mandatory)][string]$Name)
     Get-ChildItem -Recurse -Filter "*$Name*" -ErrorAction SilentlyContinue
 }
+Set-Alias ff Find-File -Scope Global
 
 # Extract zip file
-function global:unzip {
+function global:Expand-ArchiveFile {
     param([Parameter(Mandatory)][string]$Path, [string]$Destination = ".")
     Expand-Archive -Path $Path -DestinationPath $Destination -Force
 }
+Set-Alias unzip Expand-ArchiveFile -Scope Global
 
 # --- System Utilities ---
+# Refresh Path environment variable from registry
+function global:Update-EnvironmentPath {
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+    Write-Host "Path environment variables reloaded." -ForegroundColor Green
+}
+Set-Alias Refresh-Path Update-EnvironmentPath -Scope Global
+
 # Run as Administrator
-function global:sudo {
+function global:Invoke-ElevatedCommand {
     param([string]$Command, [Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
     
     # Install gsudo (sudo for Windows) if not found
     if (-not (Get-Command gsudo -ErrorAction SilentlyContinue)) {
         Write-Host "gsudo not found. Installing..." -ForegroundColor Yellow
         winget install gerardog.gsudo -s winget --accept-source-agreements --accept-package-agreements
+        Update-EnvironmentPath
     }
 
     $cmd = if ($Command) { Get-Command $Command -ErrorAction SilentlyContinue | Select-Object -First 1 } else { $null }
@@ -105,9 +118,36 @@ function global:sudo {
         }
     }
 }
+Set-Alias sudo Invoke-ElevatedCommand -Scope Global
+
+# Upgrade all software via winget
+function global:Update-WingetPackages {
+    Write-Host "--- Winget Upgrade ---" -ForegroundColor Cyan
+    winget upgrade --all --include-unknown --accept-source-agreements --accept-package-agreements
+    Update-EnvironmentPath
+}
+Set-Alias up Update-WingetPackages -Scope Global
+
+# Kill process on port
+function global:Stop-PortProcess {
+    param([int]$Port)
+    $tcp = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
+    if ($tcp) {
+        $proc = Get-Process -Id $tcp.OwningProcess -ErrorAction SilentlyContinue
+        if ($proc) {
+            Stop-Process -Id $tcp.OwningProcess -Force
+            Write-Host "Killed process $($proc.ProcessName) (PID: $($tcp.OwningProcess)) on port $Port" -ForegroundColor Green
+        } else {
+            Write-Host "Found PID $($tcp.OwningProcess) on port $Port, but could not access process (try sudo)." -ForegroundColor Red
+        }
+    } else {
+        Write-Host "No process found listening on port $Port" -ForegroundColor Yellow
+    }
+}
+if (-not (Test-Path Alias:kill-port)) { Set-Alias kill-port Stop-PortProcess -Scope Global }
 
 # Reboot the computer
-function global:reboot {
+function global:Invoke-RebootCountdown {
     Write-Host "Rebooting in 5 seconds... Press any key to cancel." -ForegroundColor Yellow
     for ($i = 5; $i -gt 0; $i--) {
         Write-Host -NoNewline "$i... "
@@ -123,6 +163,7 @@ function global:reboot {
     Write-Host "`nRebooting..." -ForegroundColor Red
     Restart-Computer
 }
+Set-Alias reboot Invoke-RebootCountdown -Scope Global
 
 $Global:RebootMarkerPath = "$env:TEMP\ps_scheduled_reboot.xml"
 
@@ -142,7 +183,7 @@ function global:Get-PendingReboot {
 }
 
 # Schedule a timed reboot
-function global:treboot {
+function global:Register-ScheduledReboot {
     param([string]$Time = "3AM")
     try {
         $target = Get-Date $Time
@@ -157,18 +198,20 @@ function global:treboot {
         Write-Error "Invalid time format (try '2AM', '16:30') or error scheduling."
     }
 }
+Set-Alias treboot Register-ScheduledReboot -Scope Global
 
 # Abort scheduled reboot
-function global:areboot {
+function global:Unregister-ScheduledReboot {
     shutdown.exe /a
     if (Test-Path $Global:RebootMarkerPath) {
         Remove-Item $Global:RebootMarkerPath -Force
     }
     Write-Host "Scheduled reboot cancelled." -ForegroundColor Green
 }
+Set-Alias areboot Unregister-ScheduledReboot -Scope Global
 
 # Lock the computer and turn off monitors
-function global:lock {
+function global:Invoke-LockWorkstation {
     Write-Host "Locking in 5 seconds... Press any key to cancel." -ForegroundColor Yellow
     for ($i = 5; $i -gt 0; $i--) {
         Write-Host -NoNewline "$i... "
@@ -188,7 +231,8 @@ function global:lock {
     }
     [void][Win32Functions.Win32PowerControl]::PostMessage(0xFFFF, 0x0112, 0xF170, 2)
 }
-if (-not (Test-Path Alias:l)) { Set-Alias l lock -Scope Global }
+if (-not (Test-Path Alias:l)) { Set-Alias l Invoke-LockWorkstation -Scope Global }
+Set-Alias lock Invoke-LockWorkstation -Scope Global
 
 # Clear PSReadLine History
 function global:Clear-PSHistory {
@@ -205,11 +249,12 @@ function global:Clear-PSHistory {
 if (-not (Test-Path Alias:grep)) { Set-Alias grep Select-String -Scope Global }
 if (-not (Test-Path Alias:open)) { Set-Alias open Invoke-Item -Scope Global }
 
-function global:which ([string]$Name) {
+function global:Get-CommandSource ([string]$Name) {
     Get-Command $Name -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
 }
+Set-Alias which Get-CommandSource -Scope Global
 
-function global:base64 {
+function global:Convert-Base64 {
     param([Parameter(ValueFromPipeline)][string]$String, [switch]$Decode)
     process {
         if ($Decode) {
@@ -219,39 +264,47 @@ function global:base64 {
         }
     }
 }
+Set-Alias base64 Convert-Base64 -Scope Global
 
-function global:df { Get-Volume }
+function global:Get-VolumeInfo { Get-Volume }
+Set-Alias df Get-VolumeInfo -Scope Global
 
-function global:du {
+function global:Get-DirectorySize {
     param([string]$Path = ".")
     $size = (Get-ChildItem $Path -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
     [PSCustomObject]@{ Path = (Resolve-Path $Path); Size = "{0:N2} MB" -f ($size / 1MB) }
 }
+Set-Alias du Get-DirectorySize -Scope Global
 
-function global:free {
+function global:Get-MemoryUsage {
     Get-CimInstance Win32_OperatingSystem | Select-Object @{N="Total(GB)";E={"{0:N2}" -f ($_.TotalVisibleMemorySize / 1MB)}}, @{N="Free(GB)";E={"{0:N2}" -f ($_.FreePhysicalMemory / 1MB)}}
 }
+Set-Alias free Get-MemoryUsage -Scope Global
 
-function global:uptime {
+function global:Get-SystemUptime {
     $boot = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
     $uptime = (Get-Date) - $boot
     "Up for $($uptime.Days)d $($uptime.Hours)h $($uptime.Minutes)m"
 }
+Set-Alias uptime Get-SystemUptime -Scope Global
 
-function global:head {
+function global:Get-ContentHead {
     param([string[]]$Path, [int]$n = 10)
     if ($Path) { Get-Content $Path -TotalCount $n } else { $input | Select-Object -First $n }
 }
+Set-Alias head Get-ContentHead -Scope Global
 
-function global:tail {
+function global:Get-ContentTail {
     param([string[]]$Path, [int]$n = 10)
     if ($Path) { Get-Content $Path -Tail $n } else { $input | Select-Object -Last $n }
 }
+Set-Alias tail Get-ContentTail -Scope Global
 
-function global:wc {
+function global:Measure-Content {
     param([string[]]$Path)
     if ($Path) { Get-Content $Path | Measure-Object -Line -Word -Character } else { $input | Measure-Object -Line -Word -Character }
 }
+Set-Alias wc Measure-Content -Scope Global
 
 # --- Developer Tools ---
 function global:gst { git status -sb }
@@ -293,28 +346,6 @@ function global:gd { git diff $args }
 function global:gbr { git branch $args }
 function global:gsta { git stash push $args }
 function global:gstp { git stash pop $args }
-
-function global:Stop-PortProcess {
-    param([int]$Port)
-    $tcp = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
-    if ($tcp) {
-        $proc = Get-Process -Id $tcp.OwningProcess -ErrorAction SilentlyContinue
-        if ($proc) {
-            Stop-Process -Id $tcp.OwningProcess -Force
-            Write-Host "Killed process $($proc.ProcessName) (PID: $($tcp.OwningProcess)) on port $Port" -ForegroundColor Green
-        } else {
-            Write-Host "Found PID $($tcp.OwningProcess) on port $Port, but could not access process (try sudo)." -ForegroundColor Red
-        }
-    } else {
-        Write-Host "No process found listening on port $Port" -ForegroundColor Yellow
-    }
-}
-if (-not (Test-Path Alias:kill-port)) { Set-Alias kill-port Stop-PortProcess -Scope Global }
-
-function global:up {
-    Write-Host "--- Winget Upgrade ---" -ForegroundColor Cyan
-    winget upgrade --all --include-unknown --accept-source-agreements --accept-package-agreements
-}
 
 # --- Terminal Configuration ---
 # Set Windows Terminal Appearance

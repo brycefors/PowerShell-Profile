@@ -5,8 +5,8 @@ This repository contains my personal PowerShell profile script, designed to enha
 ## Features
 
 ### 🎨 Appearance & Shell Configuration
-- **Oh My Posh**: Automatically checks for, installs (via `winget`), and initializes Oh My Posh for a rich prompt experience.
-- **Nerd Fonts**: Detects if the **JetBrains Mono** Nerd Font is installed. If not, it installs it automatically.
+- **Oh My Posh**: Checks for and initializes Oh My Posh for a rich prompt experience (if installed).
+- **Nerd Fonts**: Configures **JetBrains Mono** Nerd Font as the default font if running in a supported terminal.
 - **Windows Terminal Auto-Config**: If running inside Windows Terminal, it attempts to update the `settings.json` to use the installed Nerd Font automatically.
 - **VS Code Auto-Config**: If running inside VS Code, it attempts to update the `settings.json` to use the installed Nerd Font automatically.
 - **IntelliSense**: Enables History-based Predictive IntelliSense with a ListView style (requires PowerShell 7+).
@@ -17,37 +17,38 @@ This repository contains my personal PowerShell profile script, designed to enha
 #### Navigation
 - `..`: Go up one directory.
 - `...`: Go up two directories.
-- `mk <path>`: Create a directory and immediately enter it (`mkdir` + `cd`).
+- `mk <path>`: Alias for `New-DirectoryAndEnter`. Create a directory and immediately enter it (`mkdir` + `cd`).
 
 #### File Operations
-- `ll`: List all files (forces display of hidden items).
-- `touch <path>`: Create a new file or update the timestamp of an existing one.
-- `ff <name>`: Find files recursively by name in the current directory.
-- `unzip <path> [destination]`: Extract a zip file (defaults to current directory).
+- `ll`: Alias for `Get-ChildItemForce`. List all files (forces display of hidden items).
+- `touch <path>`: Alias for `Update-FileTimestamp`. Create a new file or update the timestamp of an existing one.
+- `ff <name>`: Alias for `Find-File`. Find files recursively by name in the current directory.
+- `unzip <path> [destination]`: Alias for `Expand-ArchiveFile`. Extract a zip file (defaults to current directory).
 
 #### System & Utilities
-- `sudo [command]`: Run a command as Administrator (or elevate current shell if no command provided).
-- `reboot`: Reboot the computer with a 5-second countdown (cancellable).
-- `treboot [time]`: Schedule a reboot at a specific time (defaults to 3AM).
-- `areboot`: Cancel a scheduled reboot.
-- `lock` (alias `l`): Lock the workstation and turn off monitors with a 5-second countdown (cancellable).
+- `sudo [command]`: Alias for `Invoke-ElevatedCommand`. Run a command as Administrator (or elevate current shell if no command provided).
+- `reboot`: Alias for `Invoke-RebootCountdown`. Reboot the computer with a 5-second countdown (cancellable).
+- `treboot [time]`: Alias for `Register-ScheduledReboot`. Schedule a reboot at a specific time (defaults to 3AM).
+- `areboot`: Alias for `Unregister-ScheduledReboot`. Cancel a scheduled reboot.
+- `lock` (alias `l`): Alias for `Invoke-LockWorkstation`. Lock the workstation and turn off monitors with a 5-second countdown (cancellable).
 - `Clear-PSHistory`: Clears both in-memory and persistent PSReadLine history.
 - **Winget Completion**: Registers native argument completion for `winget`.
-- `up`: Upgrade all installed software via `winget` (includes unknown versions).
+- `up`: Alias for `Update-WingetPackages`. Upgrade all installed software via `winget` and reloads the `PATH` environment variable.
+- `Refresh-Path`: Alias for `Update-EnvironmentPath`. Reloads the `PATH` environment variable from the registry (Machine + User).
 - `kill-port <port>`: Alias for `Stop-PortProcess`. Finds and stops the process listening on a specific TCP port.
 
 #### Unix Compatibility
 - `grep`: Alias for `Select-String`.
 - `open`: Alias for `Invoke-Item`.
-- `which <name>`: Returns the source path of a command.
-- `base64 <string>`: Encode a string to Base64 (use `-Decode` switch to decode).
-- `df`: View disk volume information.
-- `du [path]`: Calculate directory size.
-- `free`: Display memory usage (Total/Free).
-- `uptime`: Show system uptime.
-- `head [file]`: Display first 10 lines (supports pipeline).
-- `tail [file]`: Display last 10 lines (supports pipeline).
-- `wc [file]`: Count lines, words, and characters (supports pipeline).
+- `which <name>`: Alias for `Get-CommandSource`. Returns the source path of a command.
+- `base64 <string>`: Alias for `Convert-Base64`. Encode a string to Base64 (use `-Decode` switch to decode).
+- `df`: Alias for `Get-VolumeInfo`. View disk volume information.
+- `du [path]`: Alias for `Get-DirectorySize`. Calculate directory size.
+- `free`: Alias for `Get-MemoryUsage`. Display memory usage (Total/Free).
+- `uptime`: Alias for `Get-SystemUptime`. Show system uptime.
+- `head [file]`: Alias for `Get-ContentHead`. Display first 10 lines (supports pipeline).
+- `tail [file]`: Alias for `Get-ContentTail`. Display last 10 lines (supports pipeline).
+- `wc [file]`: Alias for `Measure-Content`. Count lines, words, and characters (supports pipeline).
 
 #### Git Shortcuts
 - `gst`: `git status -sb` (short format).
@@ -85,4 +86,4 @@ New-Item -ItemType SymbolicLink -Path $PROFILE -Value "$PWD\Microsoft.PowerShell
 - **gsudo**: Recommended for inline `sudo` elevation (installed automatically if missing).
 - **Windows Terminal**: Recommended for full font and glyph support.
 
-> **Note**: The script modifies Windows Terminal settings (`settings.json`) to apply the font. It creates a backup of the settings implicitly by how `Set-Content` works, but reviewing the `Set-WTFont` function is recommended before running.
+> **Note**: The script modifies Windows Terminal settings (`settings.json`) to apply the font. It does **not** create a backup of the settings, so reviewing the `Set-WTAppearance` function is recommended before running.
