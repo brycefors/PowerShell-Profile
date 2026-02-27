@@ -366,8 +366,8 @@ function global:gstp { git stash pop $args }
 function global:Set-WTAppearance {
     param(
         [string]$FontName = "JetBrainsMonoNL Nerd Font",
-        [double]$Opacity = 0.8,
-        [bool]$UseAcrylic = $true,
+        [double]$Opacity = 0.99,
+        [bool]$UseAcrylic = $false,
         [bool]$UseAcrylicInTabRow = $true
     )
     $settingsPath = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
