@@ -442,6 +442,22 @@ function global:Measure-Content {
 Set-Alias wc Measure-Content -Scope Global
 
 # --- Developer Tools ---
+# Install Git via winget
+function global:Install-Git {
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        Write-Host "Git is already installed: $(git --version)" -ForegroundColor Green
+        return
+    }
+    Write-Host "Installing Git..." -ForegroundColor Yellow
+    winget install Git.Git -s winget --accept-source-agreements --accept-package-agreements
+    Update-EnvironmentPath
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        Write-Host "Git installed successfully: $(git --version)" -ForegroundColor Green
+    } else {
+        Write-Host "Git installation may require a terminal restart to take effect." -ForegroundColor Yellow
+    }
+}
+
 function global:gst { git status -sb }
 function global:gco {
     if ($args.Count -eq 0) {
