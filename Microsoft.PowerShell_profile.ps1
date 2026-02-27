@@ -539,6 +539,21 @@ function global:Import-Profile {
 }
 if (-not (Test-Path Alias:reload)) { Set-Alias reload Import-Profile -Scope Global }
 
+# Pull latest profile from GitHub
+function global:Update-ProfileFromRemote {
+    $url = "https://raw.githubusercontent.com/brycefors/PowerShell-Profile/main/Microsoft.PowerShell_profile.ps1"
+    Write-Host "Downloading latest profile from GitHub..." -ForegroundColor Yellow
+    try {
+        $content = (Invoke-WebRequest $url -UseBasicParsing).Content
+        Set-Content -Path $PROFILE -Value $content -Encoding UTF8 -Force
+        Write-Host "Profile updated successfully." -ForegroundColor Green
+        Import-Profile
+    } catch {
+        Write-Error "Failed to update profile: $_"
+    }
+}
+Set-Alias pull-profile Update-ProfileFromRemote -Scope Global
+
 # --- Completions ---
 # Register winget autocomplete
 Register-ArgumentCompleter -Native -CommandName winget -ScriptBlock {
