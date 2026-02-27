@@ -209,6 +209,17 @@ function global:which ([string]$Name) {
     Get-Command $Name -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
 }
 
+function global:base64 {
+    param([Parameter(ValueFromPipeline)][string]$String, [switch]$Decode)
+    process {
+        if ($Decode) {
+            [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($String))
+        } else {
+            [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($String))
+        }
+    }
+}
+
 function global:df { Get-Volume }
 
 function global:du {
@@ -243,14 +254,41 @@ function global:wc {
 }
 
 # --- Developer Tools ---
-function global:gst { git status }
-function global:gco { git checkout $args }
+function global:gst { git status -sb }
+function global:gco {
+    if ($args.Count -eq 0) {
+        $branch = git branch --format='%(refname:short)' | Out-GridView -Title "Select Branch to Checkout" -PassThru
+        if ($branch) { git checkout $branch }
+    } else {
+        git checkout $args
+    }
+}
 function global:gcmsg { git commit -m $args }
-function global:gpush { git push }
-function global:gpull { git pull }
-function global:glog { git log --oneline --graph --decorate --all }
+function global:gpush {
+    $branch = git symbolic-ref --short HEAD 2>$null
+    $upstream = git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null
+    if ($branch -and -not $upstream) {
+        git push --set-upstream origin $branch
+    } else {
+        git push $args
+    }
+}
+function global:gpull { git pull $args }
+function global:glog { git log --graph --abbrev-commit --decorate --format=format:'%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(dim white)- %an%C(reset)%C(auto)%d%C(reset)' --all }
 function global:gaa { git add --all }
 function global:gcb { git checkout -b $args }
+function global:gcom {
+    if ($args) {
+        git add --all
+        git commit -m "$args"
+    } else {
+        Write-Host "--- Status ---" -ForegroundColor Cyan
+        git status -sb
+        git add --all
+        $msg = Read-Host "Commit Message"
+        if ($msg) { git commit -m $msg } else { Write-Warning "Commit cancelled." }
+    }
+}
 function global:gd { git diff $args }
 function global:gbr { git branch $args }
 function global:gsta { git stash push $args }

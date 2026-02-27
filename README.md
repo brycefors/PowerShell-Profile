@@ -40,6 +40,7 @@ This repository contains my personal PowerShell profile script, designed to enha
 - `grep`: Alias for `Select-String`.
 - `open`: Alias for `Invoke-Item`.
 - `which <name>`: Returns the source path of a command.
+- `base64 <string>`: Encode a string to Base64 (use `-Decode` switch to decode).
 - `df`: View disk volume information.
 - `du [path]`: Calculate directory size.
 - `free`: Display memory usage (Total/Free).
@@ -49,14 +50,15 @@ This repository contains my personal PowerShell profile script, designed to enha
 - `wc [file]`: Count lines, words, and characters (supports pipeline).
 
 #### Git Shortcuts
-- `gst`: `git status`
-- `gco <args>`: `git checkout`
+- `gst`: `git status -sb` (short format).
+- `gco [branch]`: Checkout a branch. If no argument provided, opens a GUI list to select a branch.
 - `gcmsg <msg>`: `git commit -m`
-- `gpush`: `git push`
+- `gpush`: `git push`. Automatically sets upstream origin if pushing a new branch.
 - `gpull`: `git pull`
-- `glog`: `git log` (graph view)
+- `glog`: Pretty-printed git log with graph, relative dates, and colors.
 - `gaa`: `git add --all`
 - `gcb <name>`: `git checkout -b` (create and switch to branch)
+- `gcom [msg]`: Stage all changes and commit. If `msg` is provided, uses it. Otherwise, shows status and prompts.
 - `gd`: `git diff`
 - `gbr`: `git branch`
 - `gsta`: `git stash push`
