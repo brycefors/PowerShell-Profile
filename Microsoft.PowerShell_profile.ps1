@@ -2,26 +2,36 @@
 # Shows navigable menu of all options when hitting Tab
 Set-PSReadlineKeyHandler -Key Tab -Function MenuComplete
 
-if ($PSVersionTable.PSVersion.Major -ge 6 -and ($env:WT_SESSION -or $env:TERM_PROGRAM -eq 'vscode') -and ($ompCmd = Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
-    $themeUrl = "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/blue-owl.omp.json"
-    $themeDir = "$env:LOCALAPPDATA\oh-my-posh\themes"
-    if ($env:POSH_THEMES_PATH) { $themeDir = $env:POSH_THEMES_PATH }
-    if (-not (Test-Path $themeDir)) { $null = New-Item -ItemType Directory -Path $themeDir -Force }
-
-    $themeName = Split-Path $themeUrl -Leaf
-    $themePath = Join-Path $themeDir $themeName
-    if (-not (Test-Path $themePath)) {
-        Write-Host "Downloading Oh My Posh theme ($themeName)..." -ForegroundColor Yellow
-        Invoke-WebRequest $themeUrl -OutFile $themePath
+if ($PSVersionTable.PSVersion.Major -ge 6 -and ($env:WT_SESSION -or $env:TERM_PROGRAM -eq 'vscode')) {
+    $ompCmd = Get-Command oh-my-posh -ErrorAction SilentlyContinue
+    if (-not $ompCmd) {
+        Write-Host "Oh My Posh not found. Installing..." -ForegroundColor Yellow
+        winget install JanDeDobbeleer.OhMyPosh -s winget --accept-source-agreements --accept-package-agreements
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        $ompCmd = Get-Command oh-my-posh -ErrorAction SilentlyContinue
     }
 
-    # Cache the init script; only regenerate when oh-my-posh is updated
-    $ompInitScript = "$env:TEMP\omp_init.ps1"
-    if (-not (Test-Path $ompInitScript) -or
-        ($ompCmd.Source -and (Get-Item $ompCmd.Source).LastWriteTime -gt (Get-Item $ompInitScript).LastWriteTime)) {
-        oh-my-posh init pwsh --config $themePath | Set-Content $ompInitScript -Encoding UTF8
+    if ($ompCmd) {
+        $themeUrl = "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/blue-owl.omp.json"
+        $themeDir = "$env:LOCALAPPDATA\oh-my-posh\themes"
+        if ($env:POSH_THEMES_PATH) { $themeDir = $env:POSH_THEMES_PATH }
+        if (-not (Test-Path $themeDir)) { $null = New-Item -ItemType Directory -Path $themeDir -Force }
+
+        $themeName = Split-Path $themeUrl -Leaf
+        $themePath = Join-Path $themeDir $themeName
+        if (-not (Test-Path $themePath)) {
+            Write-Host "Downloading Oh My Posh theme ($themeName)..." -ForegroundColor Yellow
+            Invoke-WebRequest $themeUrl -OutFile $themePath
+        }
+
+        # Cache the init script; only regenerate when oh-my-posh is updated
+        $ompInitScript = "$env:TEMP\omp_init.ps1"
+        if (-not (Test-Path $ompInitScript) -or
+            ($ompCmd.Source -and [System.IO.File]::GetLastWriteTime($ompCmd.Source) -gt [System.IO.File]::GetLastWriteTime($ompInitScript))) {
+            oh-my-posh init pwsh --config $themePath | Set-Content $ompInitScript -Encoding UTF8
+        }
+        . $ompInitScript
     }
-    . $ompInitScript
 }
 
 # Enable Predictive IntelliSense (History based)
@@ -171,7 +181,7 @@ function global:Get-PendingReboot {
     if (-not (Test-Path $Global:RebootMarkerPath)) { return $null }
     try {
         $rebootTime = Import-Clixml $Global:RebootMarkerPath
-        $markerTime = (Get-Item $Global:RebootMarkerPath).LastWriteTime
+        $markerTime = [System.IO.File]::GetLastWriteTime($Global:RebootMarkerPath)
         $bootTime = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
         
         if ($bootTime -lt $markerTime -and $rebootTime -gt (Get-Date)) {
@@ -451,18 +461,18 @@ if ($env:WT_SESSION) {
     $wtStamp   = "$env:TEMP\wt_appearance.stamp"
     $wtSettings = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
     if (-not (Test-Path $wtStamp) -or
-        ((Test-Path $wtSettings) -and (Get-Item $wtSettings).LastWriteTime -gt (Get-Item $wtStamp).LastWriteTime)) {
+        ((Test-Path $wtSettings) -and [System.IO.File]::GetLastWriteTime($wtSettings) -gt [System.IO.File]::GetLastWriteTime($wtStamp))) {
         Set-WTAppearance
-        Get-Date | Set-Content $wtStamp
+        [System.IO.File]::WriteAllText($wtStamp, (Get-Date).ToString())
     }
 }
 if ($env:TERM_PROGRAM -eq 'vscode') {
     $vsStamp   = "$env:TEMP\vscode_font.stamp"
     $vsSettings = "$env:APPDATA\Code\User\settings.json"
     if (-not (Test-Path $vsStamp) -or
-        ((Test-Path $vsSettings) -and (Get-Item $vsSettings).LastWriteTime -gt (Get-Item $vsStamp).LastWriteTime)) {
+        ((Test-Path $vsSettings) -and [System.IO.File]::GetLastWriteTime($vsSettings) -gt [System.IO.File]::GetLastWriteTime($vsStamp))) {
         Set-VSCodeFont
-        Get-Date | Set-Content $vsStamp
+        [System.IO.File]::WriteAllText($vsStamp, (Get-Date).ToString())
     }
 }
 

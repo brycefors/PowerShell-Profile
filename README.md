@@ -5,7 +5,7 @@ This repository contains my personal PowerShell profile script, designed to enha
 ## Features
 
 ### 🎨 Appearance & Shell Configuration
-- **Oh My Posh**: Checks for and initializes Oh My Posh for a rich prompt experience (if installed).
+- **Oh My Posh**: Automatically checks for, installs (via `winget`), and initializes Oh My Posh for a rich prompt experience.
 - **Nerd Fonts**: Configures **JetBrains Mono** Nerd Font as the default font if running in a supported terminal.
 - **Windows Terminal Auto-Config**: If running inside Windows Terminal, it attempts to update the `settings.json` to use the installed Nerd Font automatically.
 - **VS Code Auto-Config**: If running inside VS Code, it attempts to update the `settings.json` to use the installed Nerd Font automatically.
