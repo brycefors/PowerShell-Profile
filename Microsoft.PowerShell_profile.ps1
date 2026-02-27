@@ -188,7 +188,7 @@ function global:lock {
     }
     [void][Win32Functions.Win32PowerControl]::PostMessage(0xFFFF, 0x0112, 0xF170, 2)
 }
-Set-Alias l lock -Scope Global
+if (-not (Test-Path Alias:l)) { Set-Alias l lock -Scope Global }
 
 # Clear PSReadLine History
 function global:Clear-PSHistory {
@@ -202,8 +202,8 @@ function global:Clear-PSHistory {
 }
 
 # --- Unix Compatibility ---
-Set-Alias grep Select-String -Scope Global
-Set-Alias open Invoke-Item -Scope Global
+if (-not (Test-Path Alias:grep)) { Set-Alias grep Select-String -Scope Global }
+if (-not (Test-Path Alias:open)) { Set-Alias open Invoke-Item -Scope Global }
 
 function global:which ([string]$Name) {
     Get-Command $Name -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
@@ -240,6 +240,42 @@ function global:tail {
 function global:wc {
     param([string[]]$Path)
     if ($Path) { Get-Content $Path | Measure-Object -Line -Word -Character } else { $input | Measure-Object -Line -Word -Character }
+}
+
+# --- Developer Tools ---
+function global:gst { git status }
+function global:gco { git checkout $args }
+function global:gcmsg { git commit -m $args }
+function global:gpush { git push }
+function global:gpull { git pull }
+function global:glog { git log --oneline --graph --decorate --all }
+function global:gaa { git add --all }
+function global:gcb { git checkout -b $args }
+function global:gd { git diff $args }
+function global:gbr { git branch $args }
+function global:gsta { git stash push $args }
+function global:gstp { git stash pop $args }
+
+function global:Stop-PortProcess {
+    param([int]$Port)
+    $tcp = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
+    if ($tcp) {
+        $proc = Get-Process -Id $tcp.OwningProcess -ErrorAction SilentlyContinue
+        if ($proc) {
+            Stop-Process -Id $tcp.OwningProcess -Force
+            Write-Host "Killed process $($proc.ProcessName) (PID: $($tcp.OwningProcess)) on port $Port" -ForegroundColor Green
+        } else {
+            Write-Host "Found PID $($tcp.OwningProcess) on port $Port, but could not access process (try sudo)." -ForegroundColor Red
+        }
+    } else {
+        Write-Host "No process found listening on port $Port" -ForegroundColor Yellow
+    }
+}
+if (-not (Test-Path Alias:kill-port)) { Set-Alias kill-port Stop-PortProcess -Scope Global }
+
+function global:up {
+    Write-Host "--- Winget Upgrade ---" -ForegroundColor Cyan
+    winget upgrade --all --include-unknown --accept-source-agreements --accept-package-agreements
 }
 
 # --- Terminal Configuration ---
@@ -308,7 +344,7 @@ function global:Edit-Profile {
     param([string]$Editor = 'code')
     if (Get-Command $Editor -ErrorAction SilentlyContinue) { & $Editor $PROFILE } else { notepad $PROFILE }
 }
-Set-Alias pro Edit-Profile -Scope Global
+if (-not (Test-Path Alias:pro)) { Set-Alias pro Edit-Profile -Scope Global }
 
 # Reload profile
 function global:Import-Profile {
@@ -325,7 +361,7 @@ function global:Import-Profile {
     }
     Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Profiles reloaded." -ForegroundColor Green
 }
-Set-Alias reload Import-Profile -Scope Global
+if (-not (Test-Path Alias:reload)) { Set-Alias reload Import-Profile -Scope Global }
 
 # --- Completions ---
 # Register winget autocomplete

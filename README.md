@@ -33,6 +33,8 @@ This repository contains my personal PowerShell profile script, designed to enha
 - `lock` (alias `l`): Lock the workstation and turn off monitors with a 5-second countdown (cancellable).
 - `Clear-PSHistory`: Clears both in-memory and persistent PSReadLine history.
 - **Winget Completion**: Registers native argument completion for `winget`.
+- `up`: Upgrade all installed software via `winget` (includes unknown versions).
+- `kill-port <port>`: Alias for `Stop-PortProcess`. Finds and stops the process listening on a specific TCP port.
 
 #### Unix Compatibility
 - `grep`: Alias for `Select-String`.
@@ -45,6 +47,20 @@ This repository contains my personal PowerShell profile script, designed to enha
 - `head [file]`: Display first 10 lines (supports pipeline).
 - `tail [file]`: Display last 10 lines (supports pipeline).
 - `wc [file]`: Count lines, words, and characters (supports pipeline).
+
+#### Git Shortcuts
+- `gst`: `git status`
+- `gco <args>`: `git checkout`
+- `gcmsg <msg>`: `git commit -m`
+- `gpush`: `git push`
+- `gpull`: `git pull`
+- `glog`: `git log` (graph view)
+- `gaa`: `git add --all`
+- `gcb <name>`: `git checkout -b` (create and switch to branch)
+- `gd`: `git diff`
+- `gbr`: `git branch`
+- `gsta`: `git stash push`
+- `gstp`: `git stash pop`
 
 #### Profile Management
 - `pro`: Edit the profile script (launches VS Code if available, falls back to Notepad).
