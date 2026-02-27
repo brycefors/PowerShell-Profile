@@ -451,7 +451,8 @@ function global:Set-WTAppearance {
         if ($UseAcrylic) {
             if ($json.profiles.defaults.acrylicOpacity -ne $Opacity) { $needUpdate = $true }
         } else {
-            if ($json.profiles.defaults.opacity -ne $Opacity) { $needUpdate = $true }
+            $intOpacity = if ($Opacity -le 1.0) { [int]($Opacity * 100) } else { $Opacity }
+            if ($json.profiles.defaults.opacity -ne $intOpacity) { $needUpdate = $true }
         }
         if ($json.useAcrylicInTabRow -ne $UseAcrylicInTabRow) { $needUpdate = $true }
 
@@ -462,7 +463,8 @@ function global:Set-WTAppearance {
         if ($UseAcrylic) {
             $json.profiles.defaults | Add-Member -MemberType NoteProperty -Name "acrylicOpacity" -Value $Opacity -Force
         } else {
-            $json.profiles.defaults | Add-Member -MemberType NoteProperty -Name "opacity" -Value $Opacity -Force
+            $intOpacity = if ($Opacity -le 1.0) { [int]($Opacity * 100) } else { $Opacity }
+            $json.profiles.defaults | Add-Member -MemberType NoteProperty -Name "opacity" -Value $intOpacity -Force
         }
         $json | Add-Member -MemberType NoteProperty -Name "useAcrylicInTabRow" -Value $UseAcrylicInTabRow -Force
         $json | ConvertTo-Json -Depth 20 | Set-Content $settingsPath -Encoding UTF8
