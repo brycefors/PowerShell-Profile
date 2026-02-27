@@ -427,6 +427,14 @@ if (-not (Test-Path Alias:pro)) { Set-Alias pro Edit-Profile -Scope Global }
 
 # Reload profile
 function global:Import-Profile {
+    # Clear cached files to force re-evaluation of settings
+    $filesToRemove = @(
+        "$env:TEMP\omp_init.ps1",
+        "$env:TEMP\wt_appearance.stamp",
+        "$env:TEMP\vscode_font.stamp"
+    )
+    $filesToRemove | ForEach-Object { if (Test-Path $_) { Remove-Item $_ -Force -ErrorAction SilentlyContinue } }
+
     @(
         $Profile.AllUsersAllHosts,
         $Profile.AllUsersCurrentHost,
@@ -438,7 +446,7 @@ function global:Import-Profile {
             . $_
         }
     }
-    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Profiles reloaded." -ForegroundColor Green
+    Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Profiles reloaded and cache cleared." -ForegroundColor Green
 }
 if (-not (Test-Path Alias:reload)) { Set-Alias reload Import-Profile -Scope Global }
 

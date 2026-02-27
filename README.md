@@ -67,7 +67,7 @@ This repository contains my personal PowerShell profile script, designed to enha
 
 #### Profile Management
 - `pro`: Edit the profile script (launches VS Code if available, falls back to Notepad).
-- `reload`: Reload the profile script in the current session.
+- `reload`: Reload the profile script in the current session and clears cached configuration stamps.
 
 ## Installation
 
