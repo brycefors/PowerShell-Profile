@@ -25,6 +25,7 @@ if ($PSVersionTable.PSVersion.Major -ge 6 -and ($env:WT_SESSION -or $env:TERM_PR
         }
 
         # Cache the init script; only regenerate when oh-my-posh is updated
+        # This significantly improves startup time by avoiding the 'oh-my-posh init' command overhead on every shell launch.
         $ompInitScript = "$env:TEMP\omp_init.ps1"
         if (-not (Test-Path $ompInitScript) -or
             ($ompCmd.Source -and [System.IO.File]::GetLastWriteTime($ompCmd.Source) -gt [System.IO.File]::GetLastWriteTime($ompInitScript))) {
@@ -51,6 +52,7 @@ function global:New-DirectoryAndEnter {
     $null = New-Item -ItemType Directory -Path $Path -Force
     Set-Location $Path
 }
+# Define alias in Global scope so it persists after profile script finishes
 Set-Alias mk New-DirectoryAndEnter -Scope Global
 
 # --- File Operations ---
@@ -85,6 +87,8 @@ Set-Alias unzip Expand-ArchiveFile -Scope Global
 
 # --- System Utilities ---
 # Refresh Path environment variable from registry
+# Reloads PATH from the Registry (Machine and User scopes) so changes (like new installs) take effect immediately
+# without restarting the PowerShell session.
 function global:Update-EnvironmentPath {
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
     Write-Host "Path environment variables reloaded." -ForegroundColor Green
@@ -110,6 +114,7 @@ function global:Invoke-ElevatedCommand {
         if (-not $Command) {
             gsudo
         } elseif ($isPsCmd) {
+            # If it's a PowerShell function/alias, we need to invoke a new shell process to run it elevated.
             $shell = (Get-Process -Id $PID).Path
             $argList = ($Arguments | ForEach-Object { "`"$_`"" }) -join ' '
             gsudo $shell -NoExit -Command "& { $Command $argList }"
@@ -117,6 +122,7 @@ function global:Invoke-ElevatedCommand {
             gsudo $Command $Arguments
         }
     } else {
+        # Fallback to standard Windows 'RunAs' verb if gsudo is missing
         $shell = (Get-Process -Id $PID).Path
         if (-not $Command) {
             Start-Process -FilePath $shell -Verb RunAs -WorkingDirectory $PWD
@@ -161,6 +167,7 @@ function global:Invoke-RebootCountdown {
     Write-Host "Rebooting in 5 seconds... Press any key to cancel." -ForegroundColor Yellow
     for ($i = 5; $i -gt 0; $i--) {
         Write-Host -NoNewline "$i... "
+        # Check for key press every 100ms to allow immediate cancellation without waiting for the full second
         for ($j = 0; $j -lt 10; $j++) {
             if ([Console]::KeyAvailable) {
                 $null = [Console]::ReadKey($true)
@@ -184,10 +191,13 @@ function global:Get-PendingReboot {
         $markerTime = [System.IO.File]::GetLastWriteTime($Global:RebootMarkerPath)
         $bootTime = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
         
+        # If the system boot time is earlier than the marker file, the reboot hasn't happened yet.
+        # If boot time is later, the reboot occurred, so we fall through to cleanup.
         if ($bootTime -lt $markerTime -and $rebootTime -gt (Get-Date)) {
             return $rebootTime
         }
     } catch {}
+    # Cleanup marker if reboot happened or file is invalid
     Remove-Item $Global:RebootMarkerPath -Force -ErrorAction SilentlyContinue
     return $null
 }
@@ -225,6 +235,7 @@ function global:Invoke-LockWorkstation {
     Write-Host "Locking in 5 seconds... Press any key to cancel." -ForegroundColor Yellow
     for ($i = 5; $i -gt 0; $i--) {
         Write-Host -NoNewline "$i... "
+        # Check for key press every 100ms to allow immediate cancellation without waiting for the full second
         for ($j = 0; $j -lt 10; $j++) {
             if ([Console]::KeyAvailable) {
                 $null = [Console]::ReadKey($true)
@@ -236,6 +247,8 @@ function global:Invoke-LockWorkstation {
     }
     Write-Host "`nLocking..." -ForegroundColor Red
     rundll32.exe user32.dll,LockWorkStation
+    # Use P/Invoke to send a system command to turn off the monitor.
+    # 0x0112 = WM_SYSCOMMAND, 0xF170 = SC_MONITORPOWER, 2 = Power Off
     if (-not ([System.Management.Automation.PSTypeName]'Win32Functions.Win32PowerControl').Type) {
         $null = Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern bool PostMessage(int hWnd, int hMsg, int wParam, int lParam);' -Name "Win32PowerControl" -Namespace Win32Functions
     }
@@ -259,6 +272,7 @@ function global:Clear-PSHistory {
 if (-not (Test-Path Alias:grep)) { Set-Alias grep Select-String -Scope Global }
 if (-not (Test-Path Alias:open)) { Set-Alias open Invoke-Item -Scope Global }
 
+# Returns the file path of a command (like Unix 'which')
 function global:Get-CommandSource ([string]$Name) {
     Get-Command $Name -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
 }
@@ -279,6 +293,7 @@ Set-Alias base64 Convert-Base64 -Scope Global
 function global:Get-VolumeInfo { Get-Volume }
 Set-Alias df Get-VolumeInfo -Scope Global
 
+# Calculates directory size by recursively summing file lengths (can be slow on large trees)
 function global:Get-DirectorySize {
     param([string]$Path = ".")
     $size = (Get-ChildItem $Path -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
@@ -307,6 +322,7 @@ function global:Get-NetworkSummary {
     param()
 
     # Determine if output is being piped by checking if this command is the last in the pipeline
+    # This allows 'ip' to show colors in the console, but output clean text when piped (e.g., 'ip | clip')
     $isPiped = $MyInvocation.PipelinePosition -lt $MyInvocation.PipelineLength
 
     $interfaces = [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() |
@@ -343,6 +359,7 @@ function global:Get-NetworkSummary {
         } else {
             $v4Str = foreach ($ip in $unicastV4) {
                 $mask = $ip.IPv4Mask
+                # Attempt reverse DNS lookup (PTR) to get hostname; use QuickTimeout to avoid UI lag
                 $revDns = try { (Resolve-DnsName -Name $ip.Address.IPAddressToString -Type PTR -DnsOnly -QuickTimeout -ErrorAction SilentlyContinue).NameHost } catch {}
                 $revDnsStr = if ($revDns -and $revDns -ne $ip.Address.IPAddressToString) { " [$($revDns.TrimEnd('.'))]" } else { "" }
 
@@ -480,6 +497,7 @@ function global:Set-WTAppearance {
     
     try {
         $jsonContent = Get-Content $settingsPath -Raw
+        # Remove JS-style comments (//) because standard JSON parsers (and older PS versions) fail on them
         if ($PSVersionTable.PSVersion.Major -le 5) {
             $jsonContent = $jsonContent -replace '(?m)^\s*//.*$',''
         }
@@ -549,7 +567,7 @@ if (-not (Test-Path Alias:pro)) { Set-Alias pro Edit-Profile -Scope Global }
 
 # Reload profile
 function global:Import-Profile {
-    # Clear cached files to force re-evaluation of settings
+    # Clear cached files to force re-evaluation of settings (Oh My Posh init, WT settings check)
     $filesToRemove = @(
         "$env:TEMP\omp_init.ps1",
         "$env:TEMP\wt_appearance.stamp",
@@ -589,6 +607,7 @@ Set-Alias pull-profile Update-ProfileFromRemote -Scope Global
 
 # --- Completions ---
 # Register winget autocomplete
+# Invokes 'winget complete' to provide context-aware suggestions (packages, commands)
 Register-ArgumentCompleter -Native -CommandName winget -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
         [Console]::InputEncoding = [Console]::OutputEncoding = $OutputEncoding = [System.Text.Utf8Encoding]::new()
@@ -602,6 +621,7 @@ Register-ArgumentCompleter -Native -CommandName winget -ScriptBlock {
 # --- Startup Execution ---
 # Auto-configure font if running in Windows Terminal
 # Stamp files prevent reading/writing JSON settings on every startup
+# We only run the heavy JSON logic if the stamp is missing or the settings file is newer than the stamp.
 if ($env:WT_SESSION) {
     $wtStamp   = "$env:TEMP\wt_appearance.stamp"
     $wtSettings = "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json"
