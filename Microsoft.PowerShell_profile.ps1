@@ -294,7 +294,11 @@ Set-Alias free Get-MemoryUsage -Scope Global
 function global:Get-SystemUptime {
     $boot = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
     $uptime = (Get-Date) - $boot
-    "Up for $($uptime.Days)d $($uptime.Hours)h $($uptime.Minutes)m"
+    $parts = @()
+    if ($uptime.Days -gt 0) { $parts += "$($uptime.Days)d" }
+    if ($uptime.Hours -gt 0) { $parts += "$($uptime.Hours)h" }
+    if ($uptime.Minutes -gt 0) { $parts += "$($uptime.Minutes)m" }
+    "Up for $(if ($parts) { $parts -join ' ' } else { "$($uptime.Seconds)s" })"
 }
 Set-Alias uptime Get-SystemUptime -Scope Global
 
