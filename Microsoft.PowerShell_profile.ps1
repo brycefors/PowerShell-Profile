@@ -1,15 +1,12 @@
-# Cache oh-my-posh command once to avoid repeated slow Get-Command calls
-$_ompCmd = Get-Command oh-my-posh -ErrorAction SilentlyContinue
-
 # --- Shell Initialization ---
 # Shows navigable menu of all options when hitting Tab
 Set-PSReadlineKeyHandler -Key Tab -Function MenuComplete
 
-if ($PSVersionTable.PSVersion.Major -ge 6 -and $_ompCmd -and ($env:WT_SESSION -or $env:TERM_PROGRAM -eq 'vscode')) {
+if ($PSVersionTable.PSVersion.Major -ge 6 -and ($env:WT_SESSION -or $env:TERM_PROGRAM -eq 'vscode') -and ($ompCmd = Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
     $themeUrl = "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/blue-owl.omp.json"
     $themeDir = "$env:LOCALAPPDATA\oh-my-posh\themes"
     if ($env:POSH_THEMES_PATH) { $themeDir = $env:POSH_THEMES_PATH }
-    if (-not (Test-Path $themeDir)) { New-Item -ItemType Directory -Path $themeDir -Force | Out-Null }
+    if (-not (Test-Path $themeDir)) { $null = New-Item -ItemType Directory -Path $themeDir -Force }
 
     $themeName = Split-Path $themeUrl -Leaf
     $themePath = Join-Path $themeDir $themeName
@@ -21,7 +18,7 @@ if ($PSVersionTable.PSVersion.Major -ge 6 -and $_ompCmd -and ($env:WT_SESSION -o
     # Cache the init script; only regenerate when oh-my-posh is updated
     $ompInitScript = "$env:TEMP\omp_init.ps1"
     if (-not (Test-Path $ompInitScript) -or
-        ($_ompCmd.Source -and (Get-Item $_ompCmd.Source).LastWriteTime -gt (Get-Item $ompInitScript).LastWriteTime)) {
+        ($ompCmd.Source -and (Get-Item $ompCmd.Source).LastWriteTime -gt (Get-Item $ompInitScript).LastWriteTime)) {
         oh-my-posh init pwsh --config $themePath | Set-Content $ompInitScript -Encoding UTF8
     }
     . $ompInitScript
@@ -41,7 +38,7 @@ function global:... { Set-Location ..\.. }
 # Create directory and enter it
 function global:mk {
     param([Parameter(Mandatory)][string]$Path)
-    New-Item -ItemType Directory -Path $Path -Force | Out-Null
+    $null = New-Item -ItemType Directory -Path $Path -Force
     Set-Location $Path
 }
 
@@ -55,7 +52,7 @@ function global:touch {
     if (Test-Path $Path) {
         (Get-Item $Path).LastWriteTime = Get-Date
     } else {
-        New-Item -ItemType File -Path $Path -Force | Out-Null
+        $null = New-Item -ItemType File -Path $Path -Force
     }
 }
 
@@ -187,9 +184,9 @@ function global:lock {
     Write-Host "`nLocking..." -ForegroundColor Red
     rundll32.exe user32.dll,LockWorkStation
     if (-not ([System.Management.Automation.PSTypeName]'Win32Functions.Win32PowerControl').Type) {
-        Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern bool PostMessage(int hWnd, int hMsg, int wParam, int lParam);' -Name "Win32PowerControl" -Namespace Win32Functions | Out-Null
+        $null = Add-Type -MemberDefinition '[DllImport("user32.dll")] public static extern bool PostMessage(int hWnd, int hMsg, int wParam, int lParam);' -Name "Win32PowerControl" -Namespace Win32Functions
     }
-    [Win32Functions.Win32PowerControl]::PostMessage(0xFFFF, 0x0112, 0xF170, 2) | Out-Null
+    [void][Win32Functions.Win32PowerControl]::PostMessage(0xFFFF, 0x0112, 0xF170, 2)
 }
 Set-Alias l lock -Scope Global
 
