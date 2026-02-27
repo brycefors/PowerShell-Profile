@@ -303,11 +303,20 @@ function global:Get-SystemUptime {
 Set-Alias uptime Get-SystemUptime -Scope Global
 
 function global:Get-NetworkSummary {
-    $interfaces = [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() | 
+    [CmdletBinding()]
+    param()
+
+    # Determine if output is being piped by checking if this command is the last in the pipeline
+    $isPiped = $MyInvocation.PipelinePosition -lt $MyInvocation.PipelineLength
+
+    $interfaces = [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() |
         Where-Object { $_.NetworkInterfaceType -ne 'Loopback' -and $_.NetworkInterfaceType -ne 'Tunnel' } |
         Sort-Object { if ($_.OperationalStatus -eq 'Up') { 0 } else { 1 } }
 
     $seenMacs = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+
+    # This will hold our structured output objects
+    $outputObjects = @()
 
     foreach ($iface in $interfaces) {
         $macClean = $iface.GetPhysicalAddress().ToString()
@@ -319,20 +328,18 @@ function global:Get-NetworkSummary {
 
         if ($seenMacs.Contains($macClean)) { continue }
         $null = $seenMacs.Add($macClean)
-        
-        $statColor = if ($iface.OperationalStatus -eq 'Up') { 'Green' } else { 'Red' }
-        Write-Host "[$($iface.Name)] " -NoNewline -ForegroundColor Magenta
-        Write-Host "($($iface.OperationalStatus))" -ForegroundColor $statColor
-        Write-Host "  Driver:   $($iface.Description)" -ForegroundColor DarkGray
-        
+
+        $outputObjects += [PSCustomObject]@{ Type = 'Header'; Name = $iface.Name; Status = $iface.OperationalStatus }
+        $outputObjects += [PSCustomObject]@{ Type = 'Driver'; Text = "  Driver:   $($iface.Description)" }
+
         $macDashed = $macClean -replace '(..)', '$1-' -replace '-$', ''
         $macColon = $macClean -replace '(..)', '$1:' -replace ':$', ''
-        Write-Host "  MAC:      $macDashed / $macColon / $macClean" -ForegroundColor Gray
+        $outputObjects += [PSCustomObject]@{ Type = 'MAC'; Text = "  MAC:      $macDashed / $macColon / $macClean" }
 
         if ($iface.OperationalStatus -ne 'Up') {
-            Write-Host "  IPv4:     Disconnected" -ForegroundColor Red
-            Write-Host "  IPv6:     Disconnected" -ForegroundColor Red
-            Write-Host "  DNS:      Disconnected" -ForegroundColor Red
+            $outputObjects += [PSCustomObject]@{ Type = 'Info'; Text = "  IPv4:     Disconnected"; Color = 'Red' }
+            $outputObjects += [PSCustomObject]@{ Type = 'Info'; Text = "  IPv6:     Disconnected"; Color = 'Red' }
+            $outputObjects += [PSCustomObject]@{ Type = 'Info'; Text = "  DNS:      Disconnected"; Color = 'Red' }
         } else {
             $v4Str = foreach ($ip in $unicastV4) {
                 $mask = $ip.IPv4Mask
@@ -340,34 +347,61 @@ function global:Get-NetworkSummary {
                 $revDnsStr = if ($revDns -and $revDns -ne $ip.Address.IPAddressToString) { " [$($revDns.TrimEnd('.'))]" } else { "" }
 
                 if ($mask) {
-                    $cidr = ($mask.GetAddressBytes() | ForEach-Object { [Convert]::ToString($_, 2).Replace('0','').Length } | Measure-Object -Sum).Sum
+                    $cidr = ($mask.GetAddressBytes() | ForEach-Object { [Convert]::ToString($_, 2).Replace('0', '').Length } | Measure-Object -Sum).Sum
                     "$($ip.Address)/$cidr ($mask)$revDnsStr"
                 } else {
                     "$($ip.Address)$revDnsStr"
                 }
             }
 
-            $resolve = {
-                param($ipObject)
-                $ipAddress = if ($ipObject -is [System.Net.IPAddress]) { $ipObject } else { $ipObject.Address }
-                $ipString = $ipAddress.IPAddressToString
-                
-                $revDns = try { (Resolve-DnsName -Name $ipString -Type PTR -DnsOnly -QuickTimeout -ErrorAction SilentlyContinue).NameHost } catch {}
-                $revDnsStr = if ($revDns -and $revDns -ne $ipString) { " [$($revDns.TrimEnd('.'))]" } else { "" }
-                "$ipString$revDnsStr"
-            }
+            $resolve = { param($ipObject)
+                         $ipAddress = if ($ipObject -is [System.Net.IPAddress]) { $ipObject } else { $ipObject.Address }
+                         $ipString = $ipAddress.IPAddressToString
+                         $revDns = try { (Resolve-DnsName -Name $ipString -Type PTR -DnsOnly -QuickTimeout -ErrorAction SilentlyContinue).NameHost } catch {}
+                         $revDnsStr = if ($revDns -and $revDns -ne $ipString) { " [$($revDns.TrimEnd('.'))]" } else { "" }
+                         "$ipString$revDnsStr" }
 
             $v6Str = ($props.UnicastAddresses | Where-Object { $_.Address.AddressFamily -eq 'InterNetworkV6' }) | ForEach-Object { & $resolve $_ }
             $gwStr = ($props.GatewayAddresses) | ForEach-Object { & $resolve $_ }
             $dnsStr = ($props.DnsAddresses) | ForEach-Object { & $resolve $_ }
 
             $dhcp = try { if ($props.GetIPv4Properties().IsDhcpEnabled) { "DHCP" } else { "Static" } } catch { "Unknown" }
-            if ($v4Str) { Write-Host "  IPv4:     $($v4Str -join ', ') [$dhcp]" -ForegroundColor Cyan }
-            if ($v6Str) { Write-Host "  IPv6:     $($v6Str -join ', ')" -ForegroundColor DarkCyan }
-            if ($gwStr) { Write-Host "  Gateway:  $($gwStr -join ', ')" -ForegroundColor Yellow }
-            if ($dnsStr) { Write-Host "  DNS:      $($dnsStr -join ', ')" -ForegroundColor Green }
+            if ($v4Str) { $outputObjects += [PSCustomObject]@{ Type = 'Info'; Text = "  IPv4:     $($v4Str -join ', ') [$dhcp]"; Color = 'Cyan' } }
+            if ($v6Str) { $outputObjects += [PSCustomObject]@{ Type = 'Info'; Text = "  IPv6:     $($v6Str -join ', ')"; Color = 'DarkCyan' } }
+            if ($gwStr) { $outputObjects += [PSCustomObject]@{ Type = 'Info'; Text = "  Gateway:  $($gwStr -join ', ')"; Color = 'Yellow' } }
+            if ($dnsStr) { $outputObjects += [PSCustomObject]@{ Type = 'Info'; Text = "  DNS:      $($dnsStr -join ', ')"; Color = 'Green' } }
         }
-        Write-Host ""
+        $outputObjects += [PSCustomObject]@{ Type = 'Blank' }
+    }
+
+    # Remove trailing blank line
+    if ($outputObjects.Count -gt 0 -and $outputObjects[-1].Type -eq 'Blank') { $outputObjects = $outputObjects | Select-Object -SkipLast 1 }
+
+    # Now process the output objects
+    if ($isPiped) {
+        # Output plain text for piping
+        foreach ($obj in $outputObjects) {
+            switch ($obj.Type) {
+                'Header' { "[$($obj.Name)] ($($obj.Status))" }
+                'Blank'  { "" }
+                default  { $obj.Text }
+            }
+        }
+    } else {
+        # Output colored text to the host
+        foreach ($obj in $outputObjects) {
+            switch ($obj.Type) {
+                'Header' {
+                    $statColor = if ($obj.Status -eq 'Up') { 'Green' } else { 'Red' }
+                    Write-Host "[$($obj.Name)] " -NoNewline -ForegroundColor Magenta
+                    Write-Host "($($obj.Status))" -ForegroundColor $statColor
+                }
+                'Driver' { Write-Host $obj.Text -ForegroundColor DarkGray }
+                'MAC'    { Write-Host $obj.Text -ForegroundColor Gray }
+                'Info'   { Write-Host $obj.Text -ForegroundColor $obj.Color }
+                'Blank'  { Write-Host "" }
+            }
+        }
     }
 }
 Set-Alias ip Get-NetworkSummary -Scope Global
