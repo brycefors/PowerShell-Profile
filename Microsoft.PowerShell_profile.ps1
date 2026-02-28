@@ -1,3 +1,6 @@
+# Ensure we are running on Windows
+if ($PSVersionTable.PSVersion.Major -ge 6 -and -not $IsWindows) { return }
+
 # --- Shell Initialization ---
 # Shows navigable menu of all options when hitting Tab
 Set-PSReadlineKeyHandler -Key Tab -Function MenuComplete
@@ -629,6 +632,7 @@ function global:Update-ProfileFromRemote {
     Write-Host "Downloading latest profile from GitHub..." -ForegroundColor Yellow
     try {
         $content = (Invoke-WebRequest $url -UseBasicParsing).Content.TrimEnd()
+        $content = $content -replace "`r`n", "`n" -replace "`n", "`r`n"
         Set-Content -Path $PROFILE -Value $content -Encoding UTF8 -Force -NoNewline
         Write-Host "Profile updated successfully." -ForegroundColor Green
         Import-Profile
