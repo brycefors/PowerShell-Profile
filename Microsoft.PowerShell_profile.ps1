@@ -93,7 +93,7 @@ Set-Alias theme Set-PoshTheme -Scope Global
 # Rotate through Oh My Posh themes (Slideshow)
 function global:Show-PoshThemeSlideshow {
     param(
-        [switch]$Alphabetical,
+        [switch]$Random,
         [int]$Seconds = 3
     )
     $themeDir = "$env:LOCALAPPDATA\oh-my-posh\themes"
@@ -105,20 +105,25 @@ function global:Show-PoshThemeSlideshow {
         $themes = Invoke-RestMethod "https://api.github.com/repos/JanDeDobbeleer/oh-my-posh/contents/themes" -ErrorAction Stop | 
                   Where-Object { $_.name -like "*.omp.json" }
         
-        if ($Alphabetical) {
-            $themes = $themes | Sort-Object name
-        } else {
+        if ($Random) {
             $themes = $themes | Sort-Object { Get-Random }
+        } else {
+            $themes = $themes | Sort-Object name
         }
     } catch {
         Write-Error "Failed to fetch themes: $_"
         return
     }
 
-    Write-Host "Starting slideshow. Press 'Enter' to select, 'Esc' or 'q' to cancel." -ForegroundColor Cyan
+    Write-Host "Starting slideshow. Controls: [<-] Prev | [->] Next | [Enter] Select | [Esc] Cancel" -ForegroundColor Cyan
     Start-Sleep -Seconds 1
 
-    foreach ($theme in $themes) {
+    $index = 0
+    while ($true) {
+        if ($index -ge $themes.Count) { $index = 0 }
+        if ($index -lt 0) { $index = $themes.Count - 1 }
+
+        $theme = $themes[$index]
         $themeName = $theme.name
         $themePath = Join-Path $themeDir $themeName
         
@@ -132,14 +137,20 @@ function global:Show-PoshThemeSlideshow {
         try { oh-my-posh init pwsh --config $themePath | Invoke-Expression } catch { continue }
 
         Clear-Host
-        Write-Host "Theme: $themeName" -ForegroundColor Yellow
-        Write-Host "Press 'Enter' to select, 'Esc' or 'q' to cancel..." -ForegroundColor Gray
+        $prevName = if ($index -gt 0) { $themes[$index - 1].name } else { $themes[-1].name }
+        $nextName = if ($index -lt $themes.Count - 1) { $themes[$index + 1].name } else { $themes[0].name }
+
+        Write-Host "Previous: $prevName" -ForegroundColor DarkGray
+        Write-Host "Current:  $themeName" -ForegroundColor Yellow
+        Write-Host "Next:     $nextName" -ForegroundColor DarkGray
+        Write-Host "Controls: [<-] Prev | [->] Next | [Enter] Select | [Esc] Cancel" -ForegroundColor Cyan
         Write-Host ""
         
         # Render the prompt to preview it
         prompt
 
         # Wait loop
+        $manualNav = $false
         $iterations = $Seconds * 10
         for ($i = 0; $i -lt $iterations; $i++) {
             if ([Console]::KeyAvailable) {
@@ -154,15 +165,21 @@ function global:Show-PoshThemeSlideshow {
                     Write-Host "`nCancelled. Reverting..." -ForegroundColor Yellow
                     Import-Profile
                     return
+                } elseif ($key.Key -eq 'LeftArrow' -or $key.KeyChar -eq 'p') {
+                    $index--
+                    $manualNav = $true
+                    break
+                } elseif ($key.Key -eq 'RightArrow' -or $key.KeyChar -eq 'n') {
+                    $index++
+                    $manualNav = $true
+                    break
                 }
             }
             Start-Sleep -Milliseconds 100
         }
-    }
 
-    # If loop finishes without selection, revert
-    Write-Host "`nSlideshow finished. Reverting..." -ForegroundColor Yellow
-    Import-Profile
+        if (-not $manualNav) { $index++ }
+    }
 }
 Set-Alias slideshow Show-PoshThemeSlideshow -Scope Global
 
