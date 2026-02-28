@@ -15,28 +15,80 @@ if ($PSVersionTable.PSVersion.Major -ge 6 -and ($env:WT_SESSION -or $env:TERM_PR
     }
 
     if ($ompCmd) {
-        $themeUrl = "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/blue-owl.omp.json"
         $themeDir = "$env:LOCALAPPDATA\oh-my-posh\themes"
         if ($env:POSH_THEMES_PATH) { $themeDir = $env:POSH_THEMES_PATH }
         if (-not (Test-Path $themeDir)) { $null = New-Item -ItemType Directory -Path $themeDir -Force }
 
-        $themeName = Split-Path $themeUrl -Leaf
+        $themeConfig = "$env:LOCALAPPDATA\oh-my-posh\selected_theme.txt"
+        $themeName = if (Test-Path $themeConfig) { Get-Content $themeConfig -Raw | ForEach-Object { $_.Trim() } } else { "blue-owl.omp.json" }
         $themePath = Join-Path $themeDir $themeName
-        if (-not (Test-Path $themePath)) {
+
+        if (-not (Test-Path $themePath) -and $themeName -eq "blue-owl.omp.json") {
+            $themeUrl = "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/blue-owl.omp.json"
             Write-Host "Downloading Oh My Posh theme ($themeName)..." -ForegroundColor Yellow
-            Invoke-WebRequest $themeUrl -OutFile $themePath
+            try { Invoke-WebRequest $themeUrl -OutFile $themePath } catch {}
         }
 
-        # Cache the init script; only regenerate when oh-my-posh is updated
+        # Cache the init script; only regenerate when oh-my-posh is updated or theme changes
         # This significantly improves startup time by avoiding the 'oh-my-posh init' command overhead on every shell launch.
         $ompInitScript = "$env:TEMP\omp_init.ps1"
-        if (-not (Test-Path $ompInitScript) -or
-            ($ompCmd.Source -and [System.IO.File]::GetLastWriteTime($ompCmd.Source) -gt [System.IO.File]::GetLastWriteTime($ompInitScript))) {
+        $shouldUpdate = -not (Test-Path $ompInitScript)
+        if (-not $shouldUpdate -and $ompCmd.Source -and [System.IO.File]::GetLastWriteTime($ompCmd.Source) -gt [System.IO.File]::GetLastWriteTime($ompInitScript)) { $shouldUpdate = $true }
+        if (-not $shouldUpdate -and (Test-Path $themeConfig) -and [System.IO.File]::GetLastWriteTime($themeConfig) -gt [System.IO.File]::GetLastWriteTime($ompInitScript)) { $shouldUpdate = $true }
+
+        if ($shouldUpdate -and (Test-Path $themePath)) {
             oh-my-posh init pwsh --config $themePath | Set-Content $ompInitScript -Encoding UTF8
         }
-        . $ompInitScript
+        if (Test-Path $ompInitScript) { . $ompInitScript }
     }
 }
+
+# Select Oh My Posh theme from GitHub
+function global:Set-PoshTheme {
+    $themeDir = "$env:LOCALAPPDATA\oh-my-posh\themes"
+    if ($env:POSH_THEMES_PATH) { $themeDir = $env:POSH_THEMES_PATH }
+    if (-not (Test-Path $themeDir)) { $null = New-Item -ItemType Directory -Path $themeDir -Force }
+    
+    Write-Host "Fetching themes from GitHub API..." -ForegroundColor Yellow
+    try {
+        $themes = Invoke-RestMethod "https://api.github.com/repos/JanDeDobbeleer/oh-my-posh/contents/themes" -ErrorAction Stop | 
+                  Where-Object { $_.name -like "*.omp.json" }
+    } catch {
+        Write-Error "Failed to fetch themes: $_"
+        return
+    }
+
+    # Prefer Out-ConsoleGridView (TUI) over Out-GridView (GUI)
+    if (-not (Get-Command Out-ConsoleGridView -ErrorAction SilentlyContinue)) {
+        if ($Host.UI.PromptForChoice("Install TUI?", "Install 'Microsoft.PowerShell.ConsoleGuiTools' for a better terminal-based menu?", ('&Yes', '&No'), 1) -eq 0) {
+            Install-Module Microsoft.PowerShell.ConsoleGuiTools -Scope CurrentUser -Force -AllowClobber
+            Import-Module Microsoft.PowerShell.ConsoleGuiTools -ErrorAction SilentlyContinue
+        }
+    }
+
+    $list = $themes | Select-Object -Property name, download_url | Sort-Object name
+    if (Get-Command Out-ConsoleGridView -ErrorAction SilentlyContinue) {
+        $selected = $list | Out-ConsoleGridView -Title "Select Oh My Posh Theme (GitHub)" -OutputMode Single
+    } else {
+        $selected = $list | Out-GridView -Title "Select Oh My Posh Theme (GitHub)" -OutputMode Single
+    }
+    
+    if ($selected) {
+        $themeName = $selected.name
+        $themePath = Join-Path $themeDir $themeName
+        
+        if (Test-Path $themePath) { Remove-Item $themePath -Force }
+        Write-Host "Downloading $themeName..." -ForegroundColor Yellow
+        Invoke-WebRequest $selected.download_url -OutFile $themePath -UseBasicParsing
+
+        $themeConfig = "$env:LOCALAPPDATA\oh-my-posh\selected_theme.txt"
+        $themeName | Set-Content $themeConfig -Force
+        Write-Host "Theme set to '$themeName'. Reloading..." -ForegroundColor Green
+        
+        Import-Profile
+    }
+}
+Set-Alias theme Set-PoshTheme -Scope Global
 
 # Enable Predictive IntelliSense (History based)
 try {
@@ -603,6 +655,7 @@ if (-not (Test-Path Alias:pro)) { Set-Alias pro Edit-Profile -Scope Global }
 
 # Reload profile
 function global:Import-Profile {
+    param([switch]$ClearCache)
     # Clear cached files to force re-evaluation of settings (Oh My Posh init, WT settings check)
     $filesToRemove = @(
         "$env:TEMP\omp_init.ps1",
@@ -610,6 +663,11 @@ function global:Import-Profile {
         "$env:TEMP\vscode_font.stamp"
     )
     $filesToRemove | ForEach-Object { if (Test-Path $_) { Remove-Item $_ -Force -ErrorAction SilentlyContinue } }
+
+    if ($ClearCache -and (Get-Command oh-my-posh -ErrorAction SilentlyContinue)) {
+        Write-Host "Cleaning Oh My Posh internal cache..." -ForegroundColor Yellow
+        oh-my-posh cache clean
+    }
 
     @(
         $Profile.AllUsersAllHosts,
@@ -631,7 +689,7 @@ function global:Update-ProfileFromRemote {
     $url = "https://raw.githubusercontent.com/brycefors/PowerShell-Profile/main/Microsoft.PowerShell_profile.ps1"
     Write-Host "Downloading latest profile from GitHub..." -ForegroundColor Yellow
     try {
-        $content = ((Invoke-WebRequest $url -UseBasicParsing).Content) -replace "`n", "`r`n"
+        $content = (Invoke-WebRequest $url -UseBasicParsing).Content -replace "`r`n", "`n" -replace "`n", "`r`n"
         Set-Content -Path $PROFILE -Value $content -Encoding UTF8 -Force -NoNewline
         Write-Host "Profile updated successfully." -ForegroundColor Green
         Import-Profile

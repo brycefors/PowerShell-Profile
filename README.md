@@ -6,6 +6,7 @@ This repository contains my personal PowerShell profile script, designed to enha
 
 ### 🎨 Appearance & Shell Configuration
 - **Oh My Posh**: Automatically checks for, installs (via `winget`), and initializes Oh My Posh for a rich prompt experience.
+- **Theme Switcher**: Built-in `theme` command to browse and apply Oh My Posh themes from GitHub.
 - **Nerd Fonts**: Configures **JetBrains Mono** Nerd Font as the default font if running in a supported terminal.
 - **Windows Terminal Auto-Config**: If running inside Windows Terminal, it attempts to update the `settings.json` to use the installed Nerd Font automatically. You can also run `Set-WTAppearance -Opacity 0.85 -UseAcrylic $true` to customize the look.
 - **VS Code Auto-Config**: If running inside VS Code, it attempts to update the `settings.json` to use the installed Nerd Font automatically.
@@ -26,6 +27,7 @@ This repository contains my personal PowerShell profile script, designed to enha
 - `unzip <path> [destination]`: Alias for `Expand-ArchiveFile`. Extract a zip file (defaults to current directory).
 
 #### System & Utilities
+- `theme`: Alias for `Set-PoshTheme`. Opens a menu to browse, download, and apply Oh My Posh themes from GitHub.
 - `sudo [command]`: Alias for `Invoke-ElevatedCommand`. Run a command as Administrator (or elevate current shell if no command provided).
 - `reboot`: Alias for `Invoke-RebootCountdown`. Reboot the computer with a 5-second countdown (cancellable).
 - `treboot [time]`: Alias for `Register-ScheduledReboot`. Schedule a reboot at a specific time (defaults to 3AM).
@@ -68,7 +70,7 @@ This repository contains my personal PowerShell profile script, designed to enha
 
 #### Profile Management
 - `pro`: Edit the profile script (launches VS Code if available, falls back to Notepad).
-- `reload`: Reload the profile script in the current session and clears cached configuration stamps.
+- `reload`: Reload the profile script. Use `reload -ClearCache` to force a deep clean of caches (Oh My Posh, fonts, etc.).
 - `pull-profile`: Alias for `Update-ProfileFromRemote`. Downloads the latest profile version from GitHub and reloads it.
 
 ## Installation
