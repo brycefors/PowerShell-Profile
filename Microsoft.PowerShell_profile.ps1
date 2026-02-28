@@ -631,8 +631,7 @@ function global:Update-ProfileFromRemote {
     $url = "https://raw.githubusercontent.com/brycefors/PowerShell-Profile/main/Microsoft.PowerShell_profile.ps1"
     Write-Host "Downloading latest profile from GitHub..." -ForegroundColor Yellow
     try {
-        $content = (Invoke-WebRequest $url -UseBasicParsing).Content.TrimEnd()
-        $content = $content -replace "`r`n", "`n" -replace "`n", "`r`n"
+        $content = ((Invoke-WebRequest $url -UseBasicParsing).Content) -replace "`n", "`r`n"
         Set-Content -Path $PROFILE -Value $content -Encoding UTF8 -Force -NoNewline
         Write-Host "Profile updated successfully." -ForegroundColor Green
         Import-Profile
