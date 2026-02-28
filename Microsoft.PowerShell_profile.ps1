@@ -90,6 +90,82 @@ function global:Set-PoshTheme {
 }
 Set-Alias theme Set-PoshTheme -Scope Global
 
+# Rotate through Oh My Posh themes (Slideshow)
+function global:Show-PoshThemeSlideshow {
+    param(
+        [switch]$Alphabetical,
+        [int]$Seconds = 3
+    )
+    $themeDir = "$env:LOCALAPPDATA\oh-my-posh\themes"
+    if ($env:POSH_THEMES_PATH) { $themeDir = $env:POSH_THEMES_PATH }
+    if (-not (Test-Path $themeDir)) { $null = New-Item -ItemType Directory -Path $themeDir -Force }
+
+    Write-Host "Fetching themes from GitHub API..." -ForegroundColor Yellow
+    try {
+        $themes = Invoke-RestMethod "https://api.github.com/repos/JanDeDobbeleer/oh-my-posh/contents/themes" -ErrorAction Stop | 
+                  Where-Object { $_.name -like "*.omp.json" }
+        
+        if ($Alphabetical) {
+            $themes = $themes | Sort-Object name
+        } else {
+            $themes = $themes | Sort-Object { Get-Random }
+        }
+    } catch {
+        Write-Error "Failed to fetch themes: $_"
+        return
+    }
+
+    Write-Host "Starting slideshow. Press 'Enter' to select, 'Esc' or 'q' to cancel." -ForegroundColor Cyan
+    Start-Sleep -Seconds 1
+
+    foreach ($theme in $themes) {
+        $themeName = $theme.name
+        $themePath = Join-Path $themeDir $themeName
+        
+        # Download if missing (skip re-downloading existing files for speed)
+        if (-not (Test-Path $themePath)) {
+            Write-Host "Downloading $themeName..." -ForegroundColor DarkGray
+            try { Invoke-WebRequest $theme.download_url -OutFile $themePath -UseBasicParsing } catch { continue }
+        }
+
+        # Apply theme temporarily
+        try { oh-my-posh init pwsh --config $themePath | Invoke-Expression } catch { continue }
+
+        Clear-Host
+        Write-Host "Theme: $themeName" -ForegroundColor Yellow
+        Write-Host "Press 'Enter' to select, 'Esc' or 'q' to cancel..." -ForegroundColor Gray
+        Write-Host ""
+        
+        # Render the prompt to preview it
+        prompt
+
+        # Wait loop
+        $iterations = $Seconds * 10
+        for ($i = 0; $i -lt $iterations; $i++) {
+            if ([Console]::KeyAvailable) {
+                $key = [Console]::ReadKey($true)
+                if ($key.Key -eq 'Enter') {
+                    $themeConfig = "$env:LOCALAPPDATA\oh-my-posh\selected_theme.txt"
+                    $themeName | Set-Content $themeConfig -Force
+                    Write-Host "`nSelected '$themeName'. Reloading..." -ForegroundColor Green
+                    Import-Profile
+                    return
+                } elseif ($key.Key -eq 'Escape' -or $key.KeyChar -eq 'q') {
+                    Write-Host "`nCancelled. Reverting..." -ForegroundColor Yellow
+                    Import-Profile
+                    return
+                }
+            }
+            Start-Sleep -Milliseconds 100
+        }
+    }
+
+    # If loop finishes without selection, revert
+    Write-Host "`nSlideshow finished. Reverting..." -ForegroundColor Yellow
+    Import-Profile
+}
+Set-Alias slideshow Show-PoshThemeSlideshow -Scope Global
+
 # Enable Predictive IntelliSense (History based)
 try {
     Set-PSReadLineOption -PredictionSource History

@@ -28,6 +28,7 @@ This repository contains my personal PowerShell profile script, designed to enha
 
 #### System & Utilities
 - `theme`: Alias for `Set-PoshTheme`. Opens a menu to browse, download, and apply Oh My Posh themes from GitHub.
+- `slideshow`: Alias for `Show-PoshThemeSlideshow`. Cycles through Oh My Posh themes (random by default). Use `-Alphabetical` to sort, and `-Seconds <int>` to set duration. Press `Enter` to select, `Esc` to cancel.
 - `sudo [command]`: Alias for `Invoke-ElevatedCommand`. Run a command as Administrator (or elevate current shell if no command provided).
 - `reboot`: Alias for `Invoke-RebootCountdown`. Reboot the computer with a 5-second countdown (cancellable).
 - `treboot [time]`: Alias for `Register-ScheduledReboot`. Schedule a reboot at a specific time (defaults to 3AM).
