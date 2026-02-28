@@ -279,14 +279,42 @@ function global:Convert-Base64 {
 }
 Set-Alias base64 Convert-Base64 -Scope Global
 
-function global:Get-VolumeInfo { Get-Volume }
+function global:Get-VolumeInfo {
+    Get-Volume | Where-Object { $_.Size -gt 0 } | Sort-Object DriveLetter | ForEach-Object {
+        $size = $_.Size | Select-Object -First 1
+        $free = $_.SizeRemaining | Select-Object -First 1
+        [PSCustomObject]@{
+            Drive      = if ($_.DriveLetter) { $_.DriveLetter + ":" } else { $_.FileSystemLabel }
+            'Size(GB)' = "{0:N2}" -f ($size / 1GB)
+            'Used(GB)' = "{0:N2}" -f (($size - $free) / 1GB)
+            'Free(GB)' = "{0:N2}" -f ($free / 1GB)
+            '%Used'    = "{0:P1}" -f (1 - ($free / $size))
+        }
+    } | Format-Table -AutoSize
+}
 Set-Alias df Get-VolumeInfo -Scope Global
 
 # Calculates directory size by recursively summing file lengths (can be slow on large trees)
 function global:Get-DirectorySize {
     param([string]$Path = ".")
-    $size = (Get-ChildItem $Path -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
-    [PSCustomObject]@{ Path = (Resolve-Path $Path); Size = "{0:N2} MB" -f ($size / 1MB) }
+    $items = @(Get-ChildItem $Path -Force -ErrorAction SilentlyContinue)
+    if ($items.Count -eq 0) { return }
+    $count = $items.Count; $i = 0
+    $data = $items | ForEach-Object {
+        $i++; Write-Progress -Activity "Calculating Size" -Status "Scanning $($_.Name)" -PercentComplete (($i / $count) * 100)
+        $len = 0
+        if ($_.PSIsContainer) {
+            $stats = $_ | Get-ChildItem -Recurse -File -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum
+            if ($stats) { $len = $stats.Sum }
+        } else { $len = $_.Length }
+        [PSCustomObject]@{ Name = $_.Name; Raw = $len; Type = if ($_.PSIsContainer){"Dir"}else{"File"} }
+    }
+    Write-Progress -Activity "Calculating Size" -Completed
+    $total = ($data | Measure-Object Raw -Sum).Sum
+    $data | Sort-Object Raw -Descending | Select-Object `
+        @{N='Size';E={if($_.Raw -gt 1GB){"{0:N2} GB" -f ($_.Raw/1GB)}elseif($_.Raw -gt 1MB){"{0:N2} MB" -f ($_.Raw/1MB)}else{"{0:N2} KB" -f ($_.Raw/1KB)}}}, `
+        @{N='%Total';E={if($total -gt 0){"{0:P1}" -f ($_.Raw/$total)}else{"0%"}}}, Type, Name | Format-Table -AutoSize
+    Write-Host "Total: $(if($total -gt 1GB){"{0:N2} GB" -f ($total/1GB)}elseif($total -gt 1MB){"{0:N2} MB" -f ($total/1MB)}else{"{0:N2} KB" -f ($total/1KB)})" -ForegroundColor Cyan
 }
 Set-Alias du Get-DirectorySize -Scope Global
 
