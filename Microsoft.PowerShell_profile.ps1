@@ -106,40 +106,29 @@ function global:Invoke-ElevatedCommand {
         Update-EnvironmentPath
     }
 
-    $cmd = if ($Command) { Get-Command $Command -ErrorAction SilentlyContinue | Select-Object -First 1 } else { $null }
-    $isPsCmd = $cmd -and $cmd.CommandType -ne 'Application'
-    $hasGsudo = [bool](Get-Command gsudo -ErrorAction SilentlyContinue)
+    if (-not $Command) { gsudo; return }
 
-    if ($hasGsudo) {
-        if (-not $Command) {
-            gsudo
-        } elseif ($isPsCmd) {
-            # If it's a PowerShell function/alias, we need to invoke a new shell process to run it elevated.
-            $shell = (Get-Process -Id $PID).Path
-            $argList = ($Arguments | ForEach-Object { "`"$_`"" }) -join ' '
-            gsudo $shell -NoExit -Command "& { $Command $argList }"
-        } else {
-            gsudo $Command $Arguments
-        }
-    } else {
-        # Fallback to standard Windows 'RunAs' verb if gsudo is missing
+    $cmdInfo = Get-Command $Command -ErrorAction SilentlyContinue
+    if ($cmdInfo -and $cmdInfo.CommandType -ne 'Application') {
+        # If it's a PowerShell function/alias, we need to invoke a new shell process to run it elevated.
         $shell = (Get-Process -Id $PID).Path
-        if (-not $Command) {
-            Start-Process -FilePath $shell -Verb RunAs -WorkingDirectory $PWD
-        } elseif ($isPsCmd) {
-            $argList = ($Arguments | ForEach-Object { "`"$_`"" }) -join ' '
-            Start-Process -FilePath $shell -ArgumentList "-NoExit", "-Command", "& { $Command $argList }" -Verb RunAs -WorkingDirectory $PWD
-        } else {
-            Start-Process -FilePath $Command -ArgumentList $Arguments -Verb RunAs -WorkingDirectory $PWD
-        }
+        $argList = ($Arguments | ForEach-Object { "`"$_`"" }) -join ' '
+        gsudo $shell -NoExit -Command "& { $Command $argList }"
+    } else {
+        gsudo $Command $Arguments
     }
 }
 Set-Alias sudo Invoke-ElevatedCommand -Scope Global
 
 # Upgrade all software via winget
 function global:Update-WingetPackages {
+    param([Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
     Write-Host "--- Winget Upgrade ---" -ForegroundColor Cyan
-    winget upgrade --all --include-unknown --accept-source-agreements --accept-package-agreements
+    if ($Arguments) {
+        winget upgrade $Arguments --accept-source-agreements --accept-package-agreements
+    } else {
+        winget upgrade --all --include-unknown --accept-source-agreements --accept-package-agreements
+    }
     Update-EnvironmentPath
 }
 Set-Alias up Update-WingetPackages -Scope Global
@@ -611,7 +600,7 @@ function global:Update-ProfileFromRemote {
     $url = "https://raw.githubusercontent.com/brycefors/PowerShell-Profile/main/Microsoft.PowerShell_profile.ps1"
     Write-Host "Downloading latest profile from GitHub..." -ForegroundColor Yellow
     try {
-        $content = (Invoke-WebRequest $url -UseBasicParsing).Content
+        $content = (Invoke-WebRequest $url -UseBasicParsing).Content.TrimEnd()
         Set-Content -Path $PROFILE -Value $content -Encoding UTF8 -Force
         Write-Host "Profile updated successfully." -ForegroundColor Green
         Import-Profile
