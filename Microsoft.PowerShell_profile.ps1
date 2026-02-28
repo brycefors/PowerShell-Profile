@@ -601,7 +601,7 @@ function global:Update-ProfileFromRemote {
     Write-Host "Downloading latest profile from GitHub..." -ForegroundColor Yellow
     try {
         $content = (Invoke-WebRequest $url -UseBasicParsing).Content.TrimEnd()
-        Set-Content -Path $PROFILE -Value $content -Encoding UTF8 -Force
+        Set-Content -Path $PROFILE -Value $content -Encoding UTF8 -Force -NoNewline
         Write-Host "Profile updated successfully." -ForegroundColor Green
         Import-Profile
     } catch {
