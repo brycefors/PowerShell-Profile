@@ -266,6 +266,18 @@ function global:Update-WindowsPackages {
                 winget upgrade --all --include-unknown --accept-source-agreements --accept-package-agreements
             }
 
+            if (Get-CimInstance Win32_VideoController | Where-Object { $_.Name -match 'NVIDIA' }) {
+                Write-Host 'Checking NVIDIA drivers...' -ForegroundColor Yellow
+                if (-not (Get-Command TinyNvidiaUpdateChecker -ErrorAction SilentlyContinue)) {
+                    Write-Host "TinyNvidiaUpdateChecker not found. Installing..." -ForegroundColor Yellow
+                    winget install Hawaii_Beach.TinyNvidiaUpdateChecker -s winget --accept-source-agreements --accept-package-agreements
+                    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+                }
+                if (Get-Command TinyNvidiaUpdateChecker -ErrorAction SilentlyContinue) {
+                    TinyNvidiaUpdateChecker --quiet --confirm-dl --noprompt
+                }
+            }
+
             Write-Host 'Checking PowerShell modules (User Scope)...' -ForegroundColor Yellow
             $modules = @(Get-InstalledModule -ErrorAction SilentlyContinue | Where-Object { $_.InstalledLocation -like "$env:USERPROFILE*" })
             $i = 0
