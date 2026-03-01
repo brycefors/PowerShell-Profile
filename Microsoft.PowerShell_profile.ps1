@@ -275,7 +275,7 @@ function global:Update-WindowsPackages {
                 $currentVersion = $_.Version
                 Write-Progress -Activity "Updating Modules" -Status "Checking $moduleName" -PercentComplete (($i / $modules.Count) * 100)
                 try { 
-                    $result = Update-Module -Name $moduleName -Force -ErrorAction Stop -WarningAction Stop -PassThru
+                    $result = Update-Module -Name $moduleName -Confirm:$false -ErrorAction Stop -WarningAction Stop -PassThru
                     if ($result -and $result.Version -ne $currentVersion) { Write-Host "Updated $moduleName to version $($result.Version)" -ForegroundColor Green }
                 }
                 catch { 
