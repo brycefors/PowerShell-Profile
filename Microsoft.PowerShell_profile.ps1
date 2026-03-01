@@ -261,7 +261,37 @@ function global:Update-WindowsPackages {
     try {
         Invoke-ElevatedCommand {
             Write-Host 'Checking WinGet packages...' -ForegroundColor Yellow
-            winget upgrade --all --include-unknown --accept-source-agreements --accept-package-agreements
+            $upgradeResult = winget upgrade --include-unknown --accept-source-agreements 2>&1 | Out-String
+            if ($upgradeResult -notmatch "No installed package found matching input criteria.") {
+                winget upgrade --all --include-unknown --accept-source-agreements --accept-package-agreements
+            }
+
+            Write-Host 'Checking PowerShell modules...' -ForegroundColor Yellow
+            $modules = @(Get-InstalledModule -ErrorAction SilentlyContinue)
+            $i = 0
+            $modules | ForEach-Object {
+                $i++
+                $moduleName = $_.Name
+                $currentVersion = $_.Version
+                Write-Progress -Activity "Updating Modules" -Status "Checking $moduleName" -PercentComplete (($i / $modules.Count) * 100)
+                try { 
+                    $result = Update-Module -Name $moduleName -Force -ErrorAction Stop -WarningAction Stop -PassThru
+                    if ($result -and $result.Version -ne $currentVersion) { Write-Host "Updated $moduleName to version $($result.Version)" -ForegroundColor Green }
+                }
+                catch { 
+                    Write-Host "Update failed for $moduleName. Renaming old folders..." -ForegroundColor Red
+                    $paths = (Get-Module -ListAvailable -Name $moduleName -ErrorAction SilentlyContinue).ModuleBase
+                    if ($paths) {
+                        foreach ($p in $paths) {
+                            try { Rename-Item -Path $p -NewName "$p.old_$(Get-Random)" -Force -ErrorAction SilentlyContinue } catch {}
+                        }
+                    }
+                    Write-Host "  Reinstalling..." -ForegroundColor Magenta
+                    Uninstall-Module -Name $moduleName -AllVersions -Force -ErrorAction SilentlyContinue
+                    Install-Module -Name $moduleName -Force -AllowClobber -ErrorAction SilentlyContinue 
+                }
+            }
+            Write-Progress -Activity "Updating Modules" -Completed
 
             Write-Host 'Checking Windows Update packages...' -ForegroundColor Yellow
             if (-not (Get-Module -ListAvailable PSWindowsUpdate)) {
@@ -277,7 +307,7 @@ function global:Update-WindowsPackages {
         }
     }
     catch {
-        Write-Error 'Unable to update packages.'
+        Write-Error "Unable to update packages: $_"
     }
 }
 Set-Alias up Update-WindowsPackages -Scope Global
