@@ -245,8 +245,6 @@ Set-Alias Refresh-Path Update-EnvironmentPath -Scope Global
 
 # Run as Administrator
 function global:Invoke-ElevatedCommand {
-    param([string]$Command, [Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
-    
     # Install gsudo (sudo for Windows) if not found
     if (-not (Get-Command gsudo -ErrorAction SilentlyContinue)) {
         Write-Host "gsudo not found. Installing..." -ForegroundColor Yellow
@@ -254,32 +252,35 @@ function global:Invoke-ElevatedCommand {
         Update-EnvironmentPath
     }
 
-    if (-not $Command) { gsudo; return }
-
-    $cmdInfo = Get-Command $Command -ErrorAction SilentlyContinue
-    if ($cmdInfo -and $cmdInfo.CommandType -ne 'Application') {
-        # If it's a PowerShell function/alias, we need to invoke a new shell process to run it elevated.
-        $shell = (Get-Process -Id $PID).Path
-        $argList = ($Arguments | ForEach-Object { "`"$_`"" }) -join ' '
-        gsudo $shell -NoExit -Command "& { $Command $argList }"
-    } else {
-        gsudo $Command $Arguments
-    }
+   gsudo --loadProfile @args
 }
 Set-Alias sudo Invoke-ElevatedCommand -Scope Global
 
 # Upgrade all software via winget
-function global:Update-WingetPackages {
-    param([Parameter(ValueFromRemainingArguments)][string[]]$Arguments)
-    Write-Host "--- Winget Upgrade ---" -ForegroundColor Cyan
-    if ($Arguments) {
-        winget upgrade $Arguments --accept-source-agreements --accept-package-agreements
-    } else {
-        winget upgrade --all --include-unknown --accept-source-agreements --accept-package-agreements
+function global:Update-WindowsPackages {
+    try {
+        Invoke-ElevatedCommand {
+            Write-Host 'Checking WinGet packages...' -ForegroundColor Yellow
+            winget upgrade --all --include-unknown --accept-source-agreements --accept-package-agreements
+
+            Write-Host 'Checking Windows Update packages...' -ForegroundColor Yellow
+            if (-not (Get-Module -ListAvailable PSWindowsUpdate)) {
+                Write-Host 'Installing PSWindowsUpdate module...' -ForegroundColor Yellow
+                Install-Module PSWindowsUpdate -Scope CurrentUser -Force -AllowClobber -ErrorAction SilentlyContinue
+            }
+
+            if (Get-Module -ListAvailable PSWindowsUpdate) {
+                Import-Module PSWindowsUpdate
+                Get-WindowsUpdate -AcceptAll -Install -IgnoreReboot
+            }
+            Update-EnvironmentPath
+        }
     }
-    Update-EnvironmentPath
+    catch {
+        Write-Error 'Unable to update packages.'
+    }
 }
-Set-Alias up Update-WingetPackages -Scope Global
+Set-Alias up Update-WindowsPackages -Scope Global
 
 # Kill process on port
 function global:Stop-PortProcess {
