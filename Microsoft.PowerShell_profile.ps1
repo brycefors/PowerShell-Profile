@@ -266,8 +266,8 @@ function global:Update-WindowsPackages {
                 winget upgrade --all --include-unknown --accept-source-agreements --accept-package-agreements
             }
 
-            Write-Host 'Checking PowerShell modules...' -ForegroundColor Yellow
-            $modules = @(Get-InstalledModule -ErrorAction SilentlyContinue)
+            Write-Host 'Checking PowerShell modules (User Scope)...' -ForegroundColor Yellow
+            $modules = @(Get-InstalledModule -ErrorAction SilentlyContinue | Where-Object { $_.InstalledLocation -like "$env:USERPROFILE*" })
             $i = 0
             $modules | ForEach-Object {
                 $i++
@@ -288,7 +288,7 @@ function global:Update-WindowsPackages {
                     }
                     Write-Host "  Reinstalling..." -ForegroundColor Magenta
                     Uninstall-Module -Name $moduleName -AllVersions -Force -ErrorAction SilentlyContinue
-                    Install-Module -Name $moduleName -Force -AllowClobber -ErrorAction SilentlyContinue 
+                    Install-Module -Name $moduleName -Scope CurrentUser -Force -AllowClobber -ErrorAction SilentlyContinue 
                 }
             }
             Write-Progress -Activity "Updating Modules" -Completed
