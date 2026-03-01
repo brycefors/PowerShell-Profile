@@ -36,7 +36,7 @@ This repository contains my personal PowerShell profile script, designed to enha
 - `lock` (alias `l`): Alias for `Invoke-LockWorkstation`. Lock the workstation and turn off monitors with a 5-second countdown (cancellable).
 - `Clear-PSHistory`: Clears both in-memory and persistent PSReadLine history.
 - **Winget Completion**: Registers native argument completion for `winget`.
-- `up`: Alias for `Update-WindowsPackages`. Upgrade all installed software via `winget`, install/run Windows Updates (via `PSWindowsUpdate`), and reloads the `PATH` environment variable.
+- `up`: Alias for `Update-WindowsPackages`. Upgrades software via `winget`, updates NVIDIA drivers (if GPU detected), updates User-scope PowerShell modules (with auto-fix for conflicts), runs Windows Updates (via `PSWindowsUpdate`), and reloads `PATH`.
 - `Install-Git`: Checks for and installs Git via `winget` if not present.
 - `Refresh-Path`: Alias for `Update-EnvironmentPath`. Reloads the `PATH` environment variable from the registry (Machine + User).
 - `kill-port <port>`: Alias for `Stop-PortProcess`. Finds and stops the process listening on a specific TCP port.
