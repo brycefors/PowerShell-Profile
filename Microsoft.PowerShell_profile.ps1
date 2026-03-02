@@ -342,6 +342,32 @@ function global:Stop-PortProcess {
 }
 if (-not (Test-Path Alias:kill-port)) { Set-Alias kill-port Stop-PortProcess -Scope Global }
 
+# Disk Cleanup
+function global:Start-SystemCleanup {
+    $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
+    if (-not $isAdmin) {
+        Write-Host "Note: Run as Administrator (sudo cleanup) to clean system files and Component Store." -ForegroundColor Magenta
+    }
+
+    Write-Host "Emptying Recycle Bin..." -ForegroundColor Yellow
+    Clear-RecycleBin -Force -ErrorAction SilentlyContinue
+
+    Write-Host "Cleaning User Temp files..." -ForegroundColor Yellow
+    Remove-Item -Path "$env:TEMP\*" -Recurse -Force -ErrorAction SilentlyContinue
+
+    if ($isAdmin) {
+        Write-Host "Cleaning Windows Temp files..." -ForegroundColor Yellow
+        Remove-Item -Path "$env:windir\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue
+
+        Write-Host "Cleaning Component Store (DISM)... This will take some time." -ForegroundColor Yellow
+        DISM.exe /Online /Cleanup-Image /StartComponentCleanup /ResetBase
+    }
+
+    Write-Host "Launching Disk Cleanup utility..." -ForegroundColor Green
+    Start-Process cleanmgr.exe -ArgumentList "/d $env:SystemDrive"
+}
+Set-Alias cleanup Start-SystemCleanup -Scope Global
+
 # Reboot the computer
 function global:Invoke-RebootCountdown {
     Write-Host "Rebooting in 5 seconds... Press any key to cancel." -ForegroundColor Yellow

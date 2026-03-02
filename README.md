@@ -40,6 +40,7 @@ This repository contains my personal PowerShell profile script, designed to enha
 - `Install-Git`: Checks for and installs Git via `winget` if not present.
 - `Refresh-Path`: Alias for `Update-EnvironmentPath`. Reloads the `PATH` environment variable from the registry (Machine + User).
 - `kill-port <port>`: Alias for `Stop-PortProcess`. Finds and stops the process listening on a specific TCP port.
+- `cleanup`: Alias for `Start-SystemCleanup`. Empties Recycle Bin, cleans Temp folders, and launches Windows Disk Cleanup.
 
 #### Unix Compatibility
 - `grep`: Alias for `Select-String`.
