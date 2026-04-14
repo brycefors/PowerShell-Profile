@@ -5,6 +5,7 @@ if ($PSVersionTable.PSVersion.Major -ge 6 -and -not $IsWindows) { return }
 # Shows navigable menu of all options when hitting Tab
 Set-PSReadlineKeyHandler -Key Tab -Function MenuComplete
 
+# Create a variable to determine if we're administrator or not
 $Global:isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
 
 if ($PSVersionTable.PSVersion.Major -ge 6 -and ($env:WT_SESSION -or $env:TERM_PROGRAM -eq 'vscode')) {
@@ -320,7 +321,10 @@ function global:Update-WindowsPackages {
     }
     try {
         if ($isAdmin) { Invoke-Command -ScriptBlock $UpdateBlock } else {
-            Invoke-ElevatedCommand $UpdateBlock
+            # Disabled due to bug command line is too long bug
+            # Invoke-ElevatedCommand $UpdateBlock
+            Write-Host "Unable to update, please re-run as administrator." -ForegroundColor Red
+            return
         }
     }
     catch {
