@@ -733,6 +733,35 @@ function global:gsta { git stash push $args }
 function global:gstp { git stash pop $args }
 
 # --- Terminal Configuration ---
+function global:Install-JetBrainsMonoNerdFont {
+    $fontInstalled = $false
+    $registryPaths = @(
+        "HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts",
+        "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"
+    )
+
+    foreach ($path in $registryPaths) {
+        if (Test-Path $path) {
+            $fonts = Get-ItemProperty -Path $path -ErrorAction SilentlyContinue
+            $match = $fonts.PSObject.Properties | Where-Object { $_.Name -match "JetBrains\s*Mono\s*NL" }
+            if ($match) {
+                $fontInstalled = $true
+                break
+            }
+        }
+    }
+
+    if (-not $fontInstalled) {
+        Write-Host "JetBrainsMonoNL Nerd Font not found. Installing via oh-my-posh..." -ForegroundColor Yellow
+        if (Get-Command oh-my-posh -ErrorAction SilentlyContinue) {
+            try {
+                oh-my-posh font install JetBrainsMono
+                Write-Host "JetBrainsMono Nerd Font installed successfully. You may need to restart your terminal." -ForegroundColor Green
+            } catch { Write-Error "Failed to install font via oh-my-posh: $_" }
+        } else { Write-Warning "oh-my-posh command not found. Cannot automatically install the font." }
+    }
+}
+
 # Set Windows Terminal Appearance
 function global:Set-WTAppearance {
     param(
@@ -746,6 +775,9 @@ function global:Set-WTAppearance {
     if (-not (Test-Path $settingsPath)) { return }
     
     try {
+        # Check and install the font if missing
+        Install-JetBrainsMonoNerdFont
+
         $jsonContent = Get-Content $settingsPath -Raw
         # Remove JS-style comments (//) because standard JSON parsers (and older PS versions) fail on them
         if ($PSVersionTable.PSVersion.Major -le 5) {
@@ -795,6 +827,9 @@ function global:Set-VSCodeFont {
     if (-not (Test-Path $settingsPath)) { return }
     
     try {
+        # Check and install the font if missing
+        Install-JetBrainsMonoNerdFont
+
         $jsonContent = Get-Content $settingsPath -Raw
         $jsonContent = $jsonContent -replace '(?m)^\s*//.*$',''
         $json = $jsonContent | ConvertFrom-Json
