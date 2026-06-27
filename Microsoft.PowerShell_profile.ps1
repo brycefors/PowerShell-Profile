@@ -280,6 +280,26 @@ function global:Update-WindowsPackages {
                 }
             }
 
+            if ((Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue).Manufacturer -match 'Dell') {
+                Write-Host 'Checking Dell Command Update...' -ForegroundColor Yellow
+                $dcuCli = @(
+                    'C:\Program Files\Dell\CommandUpdate\dcu-cli.exe',
+                    'C:\Program Files (x86)\Dell\CommandUpdate\dcu-cli.exe'
+                ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+                if (-not $dcuCli) {
+                    Write-Host "Dell Command Update not found. Installing..." -ForegroundColor Yellow
+                    winget install Dell.CommandUpdate -s winget --accept-source-agreements --accept-package-agreements
+                    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+                    $dcuCli = @(
+                        'C:\Program Files\Dell\CommandUpdate\dcu-cli.exe',
+                        'C:\Program Files (x86)\Dell\CommandUpdate\dcu-cli.exe'
+                    ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+                }
+                if ($dcuCli) {
+                    & $dcuCli /applyUpdates -silent -reboot=disable
+                }
+            }
+
             Write-Host 'Checking PowerShell modules (User Scope)...' -ForegroundColor Yellow
             $modules = @(Get-InstalledModule -ErrorAction SilentlyContinue | Where-Object { $_.InstalledLocation -like "$env:USERPROFILE*" })
             $i = 0
