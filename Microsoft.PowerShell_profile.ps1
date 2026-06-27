@@ -296,8 +296,8 @@ function global:Update-WindowsPackages {
                     ) | Where-Object { Test-Path $_ } | Select-Object -First 1
                 }
                 if ($dcuCli) {
-                    & $dcuCli /scan -silent
-                    & $dcuCli /applyUpdates -silent -reboot=disable -autoSuspendBitLocker=enable -forceupdate=enable
+                    & $dcuCli /scan
+                    & $dcuCli /applyUpdates -reboot=disable -autoSuspendBitLocker=enable -forceupdate=enable
                 }
             }
 
