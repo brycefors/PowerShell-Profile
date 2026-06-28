@@ -968,3 +968,8 @@ if ($pendingReboot) {
     Write-Host "WARNING: System is scheduled to reboot at $($pendingReboot.ToString())" -ForegroundColor Red -BackgroundColor Black
     Write-Host "Run 'areboot' to cancel." -ForegroundColor Yellow
 }
+
+# Start each new session in the current user's profile folder.
+if (Test-Path $HOME) {
+    Set-Location -Path $HOME
+}
