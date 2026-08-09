@@ -78,6 +78,26 @@ This repository contains my personal PowerShell profile script, designed to enha
 
 ## Installation
 
+### Option 1: `install.bat` (automated)
+
+Double-click `install.bat` (or run it from `cmd`). It bootstraps everything from a clean machine:
+
+1. **Checks for PowerShell 7** — skips ahead if `pwsh.exe` is already on `PATH`.
+2. **Installs it via `winget`** (`Microsoft.PowerShell`) with source/package agreements auto-accepted.
+3. **Falls back to a direct MSI download** if `winget` is unavailable or fails. It queries the PowerShell GitHub releases API for the latest release, picks the MSI matching the CPU architecture (`x64`, `arm64`, or `x86`), downloads it to `%TEMP%`, and installs it silently with `msiexec /qn /norestart ADD_PATH=1` (prompts for elevation; exit code `3010` = reboot pending is treated as success). The MSI is deleted afterward.
+4. **Refreshes `PATH`** from the registry (Machine + User) so the freshly installed `pwsh.exe` is usable without reopening the window.
+5. **Installs the profile to every host** — resolves the real `Documents` location via `$PROFILE.CurrentUserCurrentHost` (so OneDrive-redirected folders work), then writes to:
+   - `Documents\PowerShell\Microsoft.PowerShell_profile.ps1` (PowerShell 7)
+   - `Documents\PowerShell\Microsoft.VSCode_profile.ps1` (PowerShell 7 in the VS Code extension host)
+   - `Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1` (Windows PowerShell 5.1)
+   - `Documents\WindowsPowerShell\Microsoft.VSCode_profile.ps1` (Windows PowerShell 5.1 in the VS Code extension host)
+
+   Each existing file is backed up to `*.bak_<timestamp>` first, and the profile is written as UTF-8 **with BOM** with CRLF line endings so Windows PowerShell 5.1 reads it correctly.
+
+Start a new `pwsh`, `powershell`, or VS Code terminal session afterward to load the profile.
+
+### Option 2: Symlink (for development)
+
 1. Clone this repository and navigate into the directory.
 2. Run the following command to symlink your profile:
 
@@ -89,7 +109,7 @@ New-Item -ItemType SymbolicLink -Path $PROFILE -Value "$PWD\Microsoft.PowerShell
 ## Requirements
 
 - **PowerShell**: Supports Windows PowerShell 5.1 and PowerShell 7+ (Core).
-- **Winget**: Required for the automatic installation of Oh My Posh.
+- **Winget**: Used for automatic installs (Oh My Posh, gsudo, Git, `up`). It is optional — every winget call is guarded, so without it the profile still loads and prints a skip message instead of erroring. Oh My Posh falls back to the official per-user MSIX package from `cdn.ohmyposh.dev`, and `install.bat` falls back to a direct MSI download for PowerShell 7 itself.
 - **gsudo**: Recommended for inline `sudo` elevation (installed automatically if missing).
 - **Windows Terminal**: Recommended for full font and glyph support.
 - **JetBrains Mono Nerd Font**: The profile configures the terminal to use `JetBrainsMonoNL Nerd Font`.

@@ -12,7 +12,22 @@ if ($PSVersionTable.PSVersion.Major -ge 6 -and ($env:WT_SESSION -or $env:TERM_PR
     $ompCmd = Get-Command oh-my-posh -ErrorAction SilentlyContinue
     if (-not $ompCmd) {
         Write-Host "Oh My Posh not found. Installing..." -ForegroundColor Yellow
-        winget install JanDeDobbeleer.OhMyPosh -s winget --accept-source-agreements --accept-package-agreements
+        if (Get-Command winget -ErrorAction SilentlyContinue) {
+            winget install JanDeDobbeleer.OhMyPosh -s winget --accept-source-agreements --accept-package-agreements
+        } else {
+            # No winget: use the official per-user MSIX package (x64/ARM64 only, no elevation required)
+            try {
+                $ompArch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
+                $ompMsix = Join-Path $env:TEMP "oh-my-posh-install-$ompArch.msix"
+                Write-Host "winget unavailable. Downloading Oh My Posh MSIX ($ompArch)..." -ForegroundColor Yellow
+                Invoke-WebRequest "https://cdn.ohmyposh.dev/releases/latest/install-$ompArch.msix" -OutFile $ompMsix -UseBasicParsing
+                Add-AppxPackage -Path $ompMsix
+                Remove-Item $ompMsix -Force -ErrorAction SilentlyContinue
+            } catch {
+                Write-Host "Failed to install Oh My Posh automatically: $_" -ForegroundColor Red
+                Write-Host "Install it manually from https://ohmyposh.dev/docs/installation/windows" -ForegroundColor DarkGray
+            }
+        }
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
         $ompCmd = Get-Command oh-my-posh -ErrorAction SilentlyContinue
     }
@@ -250,9 +265,18 @@ Set-Alias Refresh-Path Update-EnvironmentPath -Scope Global
 function global:Invoke-ElevatedCommand {
     # Install gsudo (sudo for Windows) if not found
     if (-not (Get-Command gsudo -ErrorAction SilentlyContinue)) {
+        if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+            Write-Host "gsudo is not installed and winget is unavailable." -ForegroundColor Red
+            Write-Host "Install it manually from https://github.com/gerardog/gsudo/releases" -ForegroundColor DarkGray
+            return
+        }
         Write-Host "gsudo not found. Installing..." -ForegroundColor Yellow
         winget install gerardog.gsudo -s winget --accept-source-agreements --accept-package-agreements
         Update-EnvironmentPath
+        if (-not (Get-Command gsudo -ErrorAction SilentlyContinue)) {
+            Write-Host "gsudo installation failed. Restart the terminal and try again." -ForegroundColor Red
+            return
+        }
     }
 
    gsudo --loadProfile @args
@@ -262,15 +286,20 @@ Set-Alias sudo Invoke-ElevatedCommand -Scope Global
 # Upgrade all software via winget
 function global:Update-WindowsPackages {
     $UpdateBlock = {
-            Write-Host 'Checking WinGet packages...' -ForegroundColor Yellow
-            $upgradeResult = winget upgrade --include-unknown --accept-source-agreements 2>&1 | Out-String
-            if ($upgradeResult -notmatch "No installed package found matching input criteria.") {
-                winget upgrade --all --include-unknown --accept-source-agreements --accept-package-agreements
+            $hasWinGet = [bool](Get-Command winget -ErrorAction SilentlyContinue)
+            if ($hasWinGet) {
+                Write-Host 'Checking WinGet packages...' -ForegroundColor Yellow
+                $upgradeResult = winget upgrade --include-unknown --accept-source-agreements 2>&1 | Out-String
+                if ($upgradeResult -notmatch "No installed package found matching input criteria.") {
+                    winget upgrade --all --include-unknown --accept-source-agreements --accept-package-agreements
+                }
+            } else {
+                Write-Host 'winget is unavailable. Skipping package upgrades.' -ForegroundColor DarkYellow
             }
 
             if (Get-CimInstance Win32_VideoController | Where-Object { $_.Name -match 'NVIDIA' }) {
                 Write-Host 'Checking NVIDIA drivers...' -ForegroundColor Yellow
-                if (-not (Get-Command TinyNvidiaUpdateChecker -ErrorAction SilentlyContinue)) {
+                if (-not (Get-Command TinyNvidiaUpdateChecker -ErrorAction SilentlyContinue) -and $hasWinGet) {
                     Write-Host "TinyNvidiaUpdateChecker not found. Installing..." -ForegroundColor Yellow
                     winget install Hawaii_Beach.TinyNvidiaUpdateChecker -s winget --accept-source-agreements --accept-package-agreements
                     $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
@@ -286,7 +315,7 @@ function global:Update-WindowsPackages {
                     'C:\Program Files\Dell\CommandUpdate\dcu-cli.exe',
                     'C:\Program Files (x86)\Dell\CommandUpdate\dcu-cli.exe'
                 ) | Where-Object { Test-Path $_ } | Select-Object -First 1
-                if (-not $dcuCli) {
+                if (-not $dcuCli -and $hasWinGet) {
                     Write-Host "Dell Command Update not found. Installing..." -ForegroundColor Yellow
                     winget install Dell.CommandUpdate -s winget --accept-source-agreements --accept-package-agreements
                     $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
@@ -712,6 +741,10 @@ function global:Install-Git {
         Write-Host "Git is already installed: $(git --version)" -ForegroundColor Green
         return
     }
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        Write-Host "winget is unavailable. Download Git manually from https://git-scm.com/download/win" -ForegroundColor Red
+        return
+    }
     Write-Host "Installing Git..." -ForegroundColor Yellow
     winget install Git.Git -s winget --accept-source-agreements --accept-package-agreements
     Update-EnvironmentPath
@@ -929,14 +962,16 @@ Set-Alias pull-profile Update-ProfileFromRemote -Scope Global
 # --- Completions ---
 # Register winget autocomplete
 # Invokes 'winget complete' to provide context-aware suggestions (packages, commands)
-Register-ArgumentCompleter -Native -CommandName winget -ScriptBlock {
-    param($wordToComplete, $commandAst, $cursorPosition)
+if (Get-Command winget -ErrorAction SilentlyContinue) {
+    Register-ArgumentCompleter -Native -CommandName winget -ScriptBlock {
+        param($wordToComplete, $commandAst, $cursorPosition)
         [Console]::InputEncoding = [Console]::OutputEncoding = $OutputEncoding = [System.Text.Utf8Encoding]::new()
         $Local:word = $wordToComplete.Replace('"', '""')
         $Local:ast = $commandAst.ToString().Replace('"', '""')
         winget complete --word="$Local:word" --commandline "$Local:ast" --position $cursorPosition | ForEach-Object {
             [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
         }
+    }
 }
 
 # --- Startup Execution ---
