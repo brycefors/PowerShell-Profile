@@ -1004,7 +1004,18 @@ if ($pendingReboot) {
     Write-Host "Run 'areboot' to cancel." -ForegroundColor Yellow
 }
 
-# Start each new session in the current user's profile folder.
-if (Test-Path $HOME) {
-    Set-Location -Path $HOME
+# Start each new session in the current user's profile folder, but only when the shell
+# was launched without a meaningful working directory (VS Code workspaces, "Open in
+# Terminal here", -WorkingDirectory and Windows Terminal startingDirectory are kept).
+if ((Test-Path $HOME) -and $PWD.Provider.Name -eq 'FileSystem') {
+    $genericStartDirs = @(
+        $PSHOME
+        "$env:SystemRoot\System32"
+        "$env:SystemRoot\SysWOW64"
+        "$env:SystemRoot"
+    ) | Where-Object { $_ } | ForEach-Object { $_.TrimEnd('\') }
+
+    if ($genericStartDirs -contains $PWD.ProviderPath.TrimEnd('\')) {
+        Set-Location -Path $HOME
+    }
 }
